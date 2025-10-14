@@ -1,0 +1,85 @@
+table {
+	width: 100%;
+}
+
+table tr {
+	vertical-align: top;
+}
+
+table th,
+table td {
+	text-align: left;
+	vertical-align: top;
+}
+
+.parts-table th,
+.pc-cpq-table--ops th {
+	font-size: 85%;
+	text-transform: uppercase;
+	letter-spacing: 1px;
+}
+
+.pc-cpq-row {
+	margin-bottom: 10px;
+	padding-bottom: 10px;
+	border-bottom: 1px dotted;
+}
+
+#pdf-routing .pc-cpq-row {
+	border-bottom: none
+}
+
+#pdf-routing .pc-cpq-row.pc-cpq-table--ops-row {
+	border-bottom: 1px dotted;
+}
+
+table .pc-cpq-col--item {
+	width: 10%;
+}
+
+table .pc-cpq-col--desc {
+	width: 60%;
+}
+
+.has-metal-factor .pc-cpq-col--desc {
+	width: 40%;
+}
+
+table .pc-cpq-col--qty {
+	width: 15%;
+}
+
+table .pc-cpq-col--factor {
+	width: 20%;
+}
+
+table .pc-cpq-col--price {
+	width: 15%;
+	text-align: right !important;
+}
+
+table .pc-cpq-col--opsdesc {
+	width: 30%;
+}
+
+table .pc-cpq-col--ops {
+	width: 60%;
+}
+
+#pdf-terms {
+	page-break-before: always;
+}
+
+#pdf-terms li {
+	margin-top: 10px;
+}
+
+#pdf-terms li ol li {
+	padding-left: 20px;
+}
+
+.pc-cpq-table--ops th,
+.pc-cpq-table--ops td {
+	vertical-align: top;
+	padding: 5px;
+}

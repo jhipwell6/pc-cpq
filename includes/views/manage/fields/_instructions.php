@@ -1,0 +1,1 @@
+<?php if ( $Input->get_acf_field( 'instructions' ) ) : ?><p><small><?php echo $Input->get_acf_field( 'instructions' ); ?></small></p><?php endif; ?>

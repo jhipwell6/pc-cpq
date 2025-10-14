@@ -1,0 +1,86 @@
+.spc-row {
+	--bs-gutter-x: 1.5rem;
+	--bs-gutter-y: 0;
+	display: flex;
+	flex-wrap: wrap;
+	margin-top: calc(var(--bs-gutter-y) * -1);
+	margin-right: calc(var(--bs-gutter-x) / -2);
+	margin-left: calc(var(--bs-gutter-x) / -2);
+}
+
+.spc-row > * {
+	box-sizing: border-box;
+	flex-shrink: 0;
+	width: 100%;
+	max-width: 100%;
+	padding-right: calc(var(--bs-gutter-x) / 2);
+	padding-left: calc(var(--bs-gutter-x) / 2);
+	margin-top: var(--bs-gutter-y);
+}
+
+.spc-col {
+	flex: 1 0 0%;
+}
+
+.spc-quote-table.wp-list-table tr:hover {
+	background: #ffffff !important;
+}
+
+.spc-quote-table.wp-list-table tr td:first-child {
+	width: 35%;
+}
+
+.spc-quote-table.wp-list-table tr td:last-child {
+	width: 65%;
+}
+
+.spc-quote-pricing-table.wp-list-table tr td:first-child {
+	width: 20%;
+}
+
+.spc-quote-pricing-table.wp-list-table tr td:not(:first-child) {
+	width: 16%;
+}
+
+.acf-input-append,
+.acf-input-wrap .acf-is-appended,
+.wp-core-ui select,
+input[type=color], input[type=date], input[type=datetime-local], input[type=datetime], input[type=email], input[type=month], input[type=number], input[type=password], input[type=search], input[type=tel], input[type=text], input[type=time], input[type=url], input[type=week], select, textarea {
+	border-radius: 0 !important;
+}
+
+#poststuff h3 {
+	font-weight: 700;
+}
+
+.acf-tab-wrap.-left .acf-tab-group li a,
+.acf-tab-wrap.-left .acf-tab-group li a:hover {
+	color: #ea5340;
+}
+
+#quote-action {
+    text-align: right;
+    line-height: 1.9;
+}
+
+.acf-fields.-sidebar.-left > .acf-tab-wrap.-left .acf-tab-group,
+.acf-fields.-sidebar.-left:before{
+    width: 100px;
+}
+
+.acf-fields.-sidebar.-left {
+    padding: 0 0 0 100px !important;
+}
+
+.acf-fields.-left > .acf-field:before,
+.acf-fields.-left > .acf-field > .acf-label {
+	width: 130px;
+}
+
+.acf-fields.-left > .acf-field > .acf-input {
+	width: calc(100% - 130px);
+}
+
+.acf-repeater .acf-row:nth-child(even) td.acf-fields {
+	background: #f9f9f9 !important;
+}
