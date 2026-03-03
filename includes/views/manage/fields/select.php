@@ -20,7 +20,7 @@
 						if ( is_array( $Input->get_value() ) ) {
 							$selected = in_array( $option_value, $Input->get_value() ) ? ' selected' : '';
 						} else {
-							$selected = $option_value == esc_attr( $Input->get_value() ) ? ' selected' : '';
+							$selected = esc_attr( $option_value ) == esc_attr( $Input->get_value() ) ? ' selected' : '';
 						}
 				?>
 				<?php if ( $this_group != $current_group && $current_group != '' ) : ?></optgroup><?php endif; ?>

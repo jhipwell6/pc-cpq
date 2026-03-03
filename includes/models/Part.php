@@ -581,7 +581,7 @@ class Part extends Repeater_Model
 			$metal_consumption = 0;
 			if ( $this->get_Processes() ) {
 				foreach ( $this->get_Processes() as $Process ) {
-					$metal_consumption += ( $this->get_area() * 144 ) * ( $Process->get_average_thickness() / 1000000 ) * $Process->get_metal_density();
+					$metal_consumption += ($this->get_area() * 144) * ($Process->get_average_thickness() / 1000000) * $Process->get_metal_density();
 				}
 			}
 			$this->metal_consumption = $metal_consumption;
@@ -596,7 +596,7 @@ class Part extends Repeater_Model
 			if ( $this->get_Processes() ) {
 				foreach ( $this->get_Processes() as $Process ) {
 					if ( $Process->is_precious_metal() ) {
-						$metal_factors[$Process->get_metal()] += ( $this->get_area() * 144 ) * ( $Process->get_average_thickness() / 1000000 ) * $Process->get_metal_density() * $this->get_Pricing()->get_metal_adder();
+						$metal_factors[$Process->get_metal()] += ($this->get_area() * 144) * ($Process->get_average_thickness() / 1000000) * $Process->get_metal_density() * $this->get_Pricing()->get_metal_adder();
 					}
 				}
 			}
@@ -616,7 +616,7 @@ class Part extends Repeater_Model
 			$material_cost = 0;
 			if ( $this->get_Processes() ) {
 				foreach ( $this->get_Processes() as $Process ) {
-					$material_cost += ( $this->get_area() * 144 ) * ( $Process->get_average_thickness() / 1000000 ) * $Process->get_metal_density() * $Process->get_metal_cost() * $this->get_Pricing()->get_metal_adder();
+					$material_cost += ($this->get_area() * 144) * ($Process->get_average_thickness() / 1000000) * $Process->get_metal_density() * $Process->get_metal_cost() * $this->get_Pricing()->get_metal_adder();
 				}
 			}
 			$this->material_cost = $material_cost;
@@ -627,7 +627,7 @@ class Part extends Repeater_Model
 	public function get_pieces_per_hour( $context = 'raw' )
 	{
 		if ( null === $this->pieces_per_hour ) {
-			$this->pieces_per_hour = ( $this->get_pieces_per_load() / $this->get_process_time() ) * $this->get_thruput_capacity();
+			$this->pieces_per_hour = ($this->get_pieces_per_load() / $this->get_process_time()) * $this->get_thruput_capacity();
 		}
 		return $context != 'raw' ? $this->round( $this->pieces_per_hour ) : $this->pieces_per_hour;
 	}
@@ -742,6 +742,26 @@ class Part extends Repeater_Model
 	/*
 	 * Helpers
 	 */
+
+	public function get_price_breaks(): array
+	{
+		$breaks = [];
+
+		foreach ( $this->get_Pricing_Model() as $Pricing ) {
+
+			$breaks[] = [
+				'qty' => $Pricing->get_quantity_min(),
+				'price' => $Pricing->get_final_price_per_unit( 'raw' ),
+			];
+		}
+
+		// ensure sorted by quantity
+		usort( $breaks, function ( $a, $b ) {
+			return $a['qty'] <=> $b['qty'];
+		} );
+
+		return $breaks;
+	}
 
 	public function get_Processes_count()
 	{
@@ -886,5 +906,4 @@ class Part extends Repeater_Model
 		];
 		$this->get_Pricing( true );
 	}
-
 }

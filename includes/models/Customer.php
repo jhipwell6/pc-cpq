@@ -38,6 +38,7 @@ class Customer extends Post_Model
 	protected $billing_street_address_2;
 	protected $billing_city;
 	protected $billing_state;
+	protected $billing_other_state;
 	protected $billing_zip;
 	protected $billing_country;
 	protected static $Shipping_Class = 'PC_CPQ\Models\Customer_Shipping';
@@ -146,6 +147,11 @@ class Customer extends Post_Model
 	{
 		return $this->get_prop( 'billing_state' );
 	}
+	
+	public function get_billing_other_state()
+	{
+		return $this->get_prop( 'billing_other_state' );
+	}
 
 	public function get_billing_zip()
 	{
@@ -235,7 +241,7 @@ class Customer extends Post_Model
 						'{street_address}' => $this->get_billing_street_address() ? $this->get_billing_street_address() . '<br />' : '',
 						'{street_address_2}' => $this->get_billing_street_address_2() ? $this->get_billing_street_address_2() . '<br />' : '',
 						'{city}' => $this->get_billing_city() ? $this->get_billing_city() . ', ' : '',
-						'{state}' => $this->get_billing_state(),
+						'{state}' => $this->get_billing_state() == 'Other' ? $this->get_billing_other_state() : $this->get_billing_state(),
 						'{zip}' => $this->get_billing_zip(),
 						'{country}' => $this->get_billing_country() ? '<br />' . $this->get_billing_country() : '',
 					)
@@ -322,6 +328,11 @@ class Customer extends Post_Model
 	public function set_billing_state( $value )
 	{
 		return $this->set_prop( 'billing_state', $value );
+	}
+	
+	public function set_billing_other_state( $value )
+	{
+		return $this->set_prop( 'billing_other_state', $value );
 	}
 	
 	public function set_billing_zip( $value )

@@ -2,8 +2,8 @@
 	<thead style="text-align: left;">
 		<tr>
 			<th style="text-align: left;">QUANTITIES</th>
-			<th style="text-align: left;">$ / <?php echo strtoupper( $Part->get_Pricing()->get_price_unit() ); ?></th>
-			<th style="text-align: left;">Tll $ / <?php echo strtoupper( $Part->get_Pricing()->get_price_unit() ); ?></th>
+			<th style="text-align: left;">$ / EA</th>
+			<th style="text-align: left;">Tll $ / EA</th>
 			<th style="text-align: left;">$ / <?php echo strtoupper( $Part->get_Pricing()->get_price_unit() ); ?></th>
 			<th style="text-align: left;">Time</th>
 		</tr>

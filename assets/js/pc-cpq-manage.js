@@ -694,7 +694,7 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 			$( document ).on( 'change', 'select[name$="/plating_method"]', $.proxy( this.togglePlatingToolInput, this ) );
 
 			$( document ).on( 'click', '.js-send-to-nutshell', $.proxy( this.sendToNutshell, this ) );
-			
+
 			$( document ).on( 'click', '.js-save-customer', $.proxy( this.saveCustomer, this ) );
 		},
 
@@ -764,6 +764,7 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 				this.leadID = response.data.leadID;
 				this.setCanSendQuote( true );
 				PC_CPQ_Manage.Common.initWpEditor( 'message' );
+				PC_CPQ_Manage.Common.initWpEditor( 'quote_notes' );
 				PC_CPQ_Manage.Common.initTooltips();
 				PC_CPQ_Manage.Common.initSelect2();
 				PC_CPQ_Manage.Common.convertUnits();
@@ -1297,11 +1298,15 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 			const $input = $( e.currentTarget );
 			const index = $input.data( 'index' );
 			const file = $input.prop( 'files' )[0];
-			const apiUrl = 'https://www.sharrettsplating.com/cgi-bin/stpmeasure.cgi';
+//			const apiUrl = 'https://archive.sharrettsplating.com/cgi-bin/stpmeasure.cgi';
+			const apiUrl = 'https://stp-api.snowberrymedia.com/measure.php';
 			const formData = new FormData();
 			formData.append( 'file', file );
 			const response = await fetch( apiUrl, {
 				method: 'POST',
+				headers: {
+					'X-API-KEY': '9f4c8e1a7b3d6c2f0e5a4b8c1d9e7f6a2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7'
+				},
 				body: formData
 			} );
 			let text = await response.text();
@@ -1428,11 +1433,11 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 				width: '100%'
 			} );
 		},
-		
+
 		saveCustomer() {
 			const foundCustomer = $( '.js-customer-select' ).val();
 			const createCustomer = $( '#create_company' ).val();
-	
+
 			const data = {
 				action: 'save_customer',
 				lead_id: this.leadID,
@@ -1442,13 +1447,14 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 
 			PC_CPQ_Manage.Form.fetch( data, ( ( response ) => {
 				$( '#customer-modal' ).modal( 'hide' )
-					.on( 'hidden.bs.modal', () => {
-						$( '#edit-lead' ).replaceWith( response.data.html );
-						PC_CPQ_Manage.Common.initWpEditor( 'message' );
-						PC_CPQ_Manage.Common.initTooltips();
-						PC_CPQ_Manage.Common.initSelect2();
-						PC_CPQ_Manage.Common.convertUnits();
-					} );
+						.on( 'hidden.bs.modal', () => {
+							$( '#edit-lead' ).replaceWith( response.data.html );
+							PC_CPQ_Manage.Common.initWpEditor( 'message' );
+							PC_CPQ_Manage.Common.initWpEditor( 'quote_notes' );
+							PC_CPQ_Manage.Common.initTooltips();
+							PC_CPQ_Manage.Common.initSelect2();
+							PC_CPQ_Manage.Common.convertUnits();
+						} );
 			} ) );
 		}
 	};

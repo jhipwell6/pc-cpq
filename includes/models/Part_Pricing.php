@@ -106,6 +106,12 @@ class Part_Pricing
 				case 'c':
 					$adjuster = 100;
 					break;
+//				case 'g':
+//					$adjuster = 1 / ( $this->get_Part()->get_weight() * 453.592 );
+//					break;
+//				case 'kg':
+//					$adjuster = 1 / ( $this->get_Part()->get_weight() / 2.204 );
+//					break;
 				default:
 					$adjuster = 1;
 			}

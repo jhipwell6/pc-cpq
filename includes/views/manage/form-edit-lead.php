@@ -1,7 +1,7 @@
 <div id="edit-lead">
 	<form action="" method="post" class="js-edit-lead-form">
 		<div class="row">
-			<div class="col-md-5">
+			<div class="col-md-4">
 				<div class="card">
 					<div class="card-header">
 						<h3 class="card-title">Details</h3>
@@ -78,7 +78,7 @@
 				<!-- /.card -->
 				<?php endif; ?>
 			</div>
-			<div class="col-md-2">
+			<div class="col-md-3">
 				<?php echo PC_CPQ()->view( 'manage/partials/save-alerts' ); ?>
 				<div class="card">
 					<div class="card-header">
@@ -95,6 +95,16 @@
 						<button type="button" class="btn btn-primary js-prepare-quote" data-toggle="modal" data-target="#prepare-quote-modal" disabled>Prepare New Quote</button>
 					</div>
 					<!-- /.card-footer -->
+				</div>
+				<!-- /.card -->
+				<div class="card">
+					<div class="card-header">
+						<h3 class="card-title">Quote Notes</h3>
+					</div>
+					<div class="card-body">
+						<?php echo PC_CPQ()->view( 'manage/fields/quote-notes', [ 'Lead' => $Lead ] ); ?>
+					</div>
+					<!-- /.card-body -->
 				</div>
 				<!-- /.card -->
 				<?php if ( $Lead->get_id() ) : ?>

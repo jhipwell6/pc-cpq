@@ -33,7 +33,6 @@
 									<?php endforeach; ?>
 								</datalist>
 								<?php endif; ?>
-								<?php // echo pc_cpq_get_input_html( 'quote_notes', $Lead ); ?>
 							</div>
 							<?php wp_nonce_field( 'send_quote', 'send_quote_nonce' ); ?>
 							<?php wp_nonce_field( 'preview_quote', 'preview_quote_nonce' ); ?>

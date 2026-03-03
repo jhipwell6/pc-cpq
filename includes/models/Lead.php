@@ -89,7 +89,7 @@ class Lead extends Post_Model
 	{
 		if ( null === $this->status ) {
 			$status = $this->get_meta( 'status' );
-			$this->status = ( $status == '' || ! $status ) ? 'New' : $status;
+			$this->status = ($status == '' || ! $status) ? 'New' : $status;
 		}
 		return $this->status;
 	}
@@ -671,6 +671,34 @@ class Lead extends Post_Model
 		return $this->routing_pdf;
 	}
 
+	public function get_override_status(): string
+	{
+		return (string) get_post_meta( $this->get_id(), 'override_status', true );
+	}
+
+	public function set_override_required( array $issues ): void
+	{
+		update_post_meta( $this->get_id(), 'override_status', 'required' );
+		update_post_meta( $this->get_id(), 'override_issues', wp_json_encode( $issues ) );
+	}
+
+	public function approve_override( int $user_id, string $note ): void
+	{
+		update_post_meta( $this->get_id(), 'override_status', 'approved' );
+		update_post_meta( $this->get_id(), 'override_by', $user_id );
+		update_post_meta( $this->get_id(), 'override_at', current_time( 'mysql' ) );
+		update_post_meta( $this->get_id(), 'override_note', $note );
+	}
+
+	public function clear_override(): void
+	{
+		delete_post_meta( $this->get_id(), 'override_status' );
+		delete_post_meta( $this->get_id(), 'override_issues' );
+		delete_post_meta( $this->get_id(), 'override_by' );
+		delete_post_meta( $this->get_id(), 'override_at' );
+		delete_post_meta( $this->get_id(), 'override_note' );
+	}
+
 	/*
 	 * Helpers
 	 */
@@ -682,7 +710,7 @@ class Lead extends Post_Model
 			if ( $this->get_company() ) {
 				$Customer = Customer::get_customer_by( 'name', $this->get_company() );
 			}
-			
+
 			if ( ! $Customer && $this->get_email() ) {
 				$Customer = Customer::get_customer_by( 'email', $this->get_email() );
 			}
@@ -690,13 +718,13 @@ class Lead extends Post_Model
 			if ( ! $Customer && $this->get_company() ) {
 				$Customer = $this->create_customer_from_lead();
 			}
-			
+
 			if ( $Customer ) {
 				$this->update_prop( 'raw_customer', $Customer->get_id() );
 			}
 		}
 	}
-	
+
 	public function create_customer_from_lead()
 	{
 		$CustomerModel = new Customer();
@@ -793,7 +821,7 @@ class Lead extends Post_Model
 		$post_id = $this->get_id();
 		$results = $wpdb->get_results( "SELECT `meta_value` FROM `{$wpdb->prefix}postmeta` WHERE `meta_key` = 'quote_number' AND `post_id` != {$post_id} ORDER BY `meta_id` DESC LIMIT 1" );
 		$number = ! empty( $results ) ? reset( $results ) : null;
-		return ( $number ) ? str_pad( (int) $number->meta_value + 1, 7, '0', STR_PAD_LEFT ) : PC_CPQ()->Settings()->get_starting_quote_number();
+		return ($number) ? str_pad( (int) $number->meta_value + 1, 7, '0', STR_PAD_LEFT ) : PC_CPQ()->Settings()->get_starting_quote_number();
 	}
 
 	protected function to_datetime( $value, $format = 'Y-m-d h:i:s' )
@@ -887,5 +915,4 @@ class Lead extends Post_Model
 
 		return false;
 	}
-
 }

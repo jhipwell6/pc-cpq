@@ -25,16 +25,18 @@ class Customer_Factory extends Factory
 		if ( ! $Customer ) {
 			return false;
 		}
+		
+		return $Customer;
 
 		// check if we've loaded the item into the collection already
 		// if yes, return it
-		if ( $this->contains( 'id', $Customer->get_id() ) && $Customer->get_id() != 0 ) {
-			return $this->where( 'id', $Customer->get_id() );
-		}
-
-		$this->add( $Customer );
-
-		return $this->last();
+//		if ( $this->contains( 'id', $Customer->get_id() ) && $Customer->get_id() != 0 ) {
+//			return $this->where( 'id', $Customer->get_id() );
+//		}
+//
+//		$this->add( $Customer );
+//
+//		return $this->last();
 	}
 
 	private function get_object( $Customer )

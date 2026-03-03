@@ -74,6 +74,45 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 		) );
 	}
 
+	public function send_quote_with_validator()
+	{
+		$send_quote_form = Form_Handler::get_form_data( 'quote' );
+		$lead_id = Form_Handler::filter_input( 'lead_id' );
+
+		Form_Handler::validate_form_data( $send_quote_form );
+		Form_Handler::pre_validate_form( 'send_quote_nonce', 'send_quote', $send_quote_form );
+
+		$Lead = PC_CPQ()->lead( $lead_id );
+		$Quote = PC_CPQ()->Quote( $Lead );
+
+		$Lead->update_prop( 'quote_pricing_type', $send_quote_form['quote_pricing_type'] );
+
+		try {
+
+			// Domain enforcement lives in the model now
+			$Quote->assert_can_send();
+
+			$Quote->send_quote( $send_quote_form['recipients'] );
+		} catch ( \Exception $e ) {
+
+			wp_send_json_error( [
+				'message' => $e->getMessage(),
+				'issues' => $Lead->get_override_issues(), // model method
+			] );
+
+			return;
+		}
+
+		$html = PC_CPQ()->view(
+			'manage/partials/quote-details',
+			array( 'Lead' => $Lead )
+		);
+
+		wp_send_json_success( [
+			'html' => $html,
+		] );
+	}
+
 	public function preview_quote()
 	{
 		// Get form data
@@ -138,6 +177,7 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 		$this->process_lead_data( $edit_lead_form );
 		$Lead->set_props( $edit_lead_form );
 		$Lead = $Lead->save();
+		$Lead->clear_override();
 
 		$this->render_lead_for_js( $Lead );
 	}
@@ -166,6 +206,7 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 
 		// add new part
 		$Lead->add_Part( null, [], true, true );
+		$Lead->clear_override();
 
 		$this->render_parts_for_js( $Lead );
 	}
@@ -335,7 +376,7 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 		$q = sanitize_text_field( $_GET['q'] ?? '' );
 		$page = max( 1, intval( $_GET['page'] ?? 1 ) );
 		$per_page = 20;
-		
+
 		$args = [
 			'post_type' => 'customer',
 			'post_status' => 'publish',
@@ -360,14 +401,14 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 			'pagination' => [ 'more' => ($page * $per_page) < (int) $query->found_posts ],
 		] );
 	}
-	
+
 	public function save_customer()
 	{
 		$lead_id = Form_Handler::filter_input( 'lead_id' );
 		$found_customer = Form_Handler::filter_input( 'foundCustomer' );
 		$create_customer = Form_Handler::filter_input( 'createCustomer' );
 		$Lead = PC_CPQ()->lead( $lead_id );
-		
+
 		if ( $found_customer && $found_customer != 'null' ) {
 			$Customer = PC_CPQ()->customer( $found_customer );
 			$Lead->update_prop( 'raw_customer', $found_customer );

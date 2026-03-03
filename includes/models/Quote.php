@@ -5,21 +5,24 @@ namespace PC_CPQ\Models;
 if ( ! defined( 'ABSPATH' ) )
 	exit;
 
+use PC_CPQ\Core\Pricing\Pricing_Validator;
+use PC_CPQ\Core\Approval\Override_Gate;
 use \GFAPI;
 
 class Quote
 {
 	const QUOTE_FORM_ID = 1;
+
 	protected $Lead;
 
 	public function __construct( \PC_CPQ\Models\Lead $Lead )
 	{
 		$this->Lead = $Lead;
 		$this->maybe_create_entry();
-		
+
 		return $this;
 	}
-	
+
 	public function send_quote( $recipients )
 	{
 		// trigger the notification
@@ -31,12 +34,56 @@ class Quote
 		// update the lead
 		$this->update_lead();
 	}
-	
+
+	public function assert_can_send(): void
+	{
+		$validator = new Pricing_Validator();
+		$gate = new Override_Gate();
+
+		$all_issues = [];
+
+		foreach ( $this->get_parts() as $Part ) {
+
+			$breaks = $Part->get_price_breaks();
+
+			if ( empty( $breaks ) ) {
+				continue;
+			}
+
+			$part_issues = $validator->validate_breaks( $breaks );
+
+			if ( ! empty( $part_issues ) ) {
+				$all_issues[$Part->get_id()] = $part_issues;
+			}
+		}
+
+		$flat = [];
+
+		foreach ( $all_issues as $issues ) {
+			foreach ( $issues as $issue ) {
+				$flat[] = $issue;
+			}
+		}
+
+		if ( empty( $flat ) ) {
+			return; // no issues — safe
+		}
+
+		if ( $gate->requires_override( $flat ) ) {
+
+			$this->Lead->set_override_required( $all_issues );
+
+			if ( $this->Lead->get_override_status() !== 'approved' ) {
+				throw new \Exception( 'Manager override required before sending this quote.' );
+			}
+		}
+	}
+
 	public function get_preview_quote_url()
-	{		
+	{
 		return $this->Lead->get_quote_pdf();
 	}
-	
+
 	public function send_message( $recipients, $message )
 	{
 		// trigger the notification
@@ -46,21 +93,21 @@ class Quote
 		GFAPI::update_entry_field( $Lead->get_form_entry_id(), 34, $message );
 		GFAPI::send_notifications( $form, $entry, 'message' );
 	}
-	
+
 	public function update_lead()
 	{
 		$this->Lead->update_prop( 'sent', 1 );
 		$this->Lead->update_prop( 'status', 'Quoted' );
-		$this->Lead->update_prop( 'quote_date', strtotime('now') );
+		$this->Lead->update_prop( 'quote_date', strtotime( 'now' ) );
 		$this->Lead->update_prop( 'follow_up_date', strtotime( '+ ' . PC_CPQ()->Settings()->get_follow_up_after() . ' days' ) );
 		$this->Lead->update_prop( 'expiration_date', strtotime( '+ ' . PC_CPQ()->Settings()->get_quote_expires_after() . ' days' ) );
 	}
-	
+
 	public function entry_exists()
 	{
 		return (bool) $this->Lead->get_form_entry_id();
 	}
-	
+
 	private function maybe_create_entry()
 	{
 		if ( ! $this->entry_exists() ) {
@@ -69,7 +116,7 @@ class Quote
 			$this->Lead->update_prop( 'form_entry_id', $form_entry_id );
 		}
 	}
-	
+
 	static public function create_entry( $Lead )
 	{
 		$date = date( 'Y-m-d H:i:s' );

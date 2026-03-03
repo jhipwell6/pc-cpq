@@ -33,8 +33,8 @@ var PC_CPQ_Admin = (function(PC_CPQ_Admin, $) {
 	});
 	
 	PC_CPQ_Admin.Lead = {
-
-		apiUrl: 'https://www.sharrettsplating.com/cgi-bin/stpmeasure.cgi',
+		
+		apiUrl: 'https://stp-api.snowberrymedia.com/measure.php',
 
 		init() {
 			if ( pagenow == 'lead' ) {
@@ -83,6 +83,9 @@ var PC_CPQ_Admin = (function(PC_CPQ_Admin, $) {
 			
 			const response = await fetch( this.apiUrl, {
 				method: 'POST',
+				headers: {
+					'X-API-KEY': '9f4c8e1a7b3d6c2f0e5a4b8c1d9e7f6a2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7'
+				},
 				body: formData
 			});
 

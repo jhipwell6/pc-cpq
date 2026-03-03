@@ -223,6 +223,9 @@ final class PC_CPQ
 		include_once $this->plugin_path() . '/includes/core/customer-factory.php';
 		include_once $this->plugin_path() . '/includes/core/part-lookup.php';
 		include_once $this->plugin_path() . '/includes/core/nutshell-service.php';
+		include_once $this->plugin_path() . '/includes/core/pricing/Elasticity_Service.php';
+		include_once $this->plugin_path() . '/includes/core/pricing/Pricing_Validator.php';
+		include_once $this->plugin_path() . '/includes/core/approval/Override_Gate.php';
 
 		// frontend
 		include_once $this->plugin_path() . '/includes/controllers/pc-cpq-custom-fields.php';

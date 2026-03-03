@@ -25,16 +25,18 @@ class Lead_Factory extends Factory
 		if ( ! $Lead ) {
 			return false;
 		}
+		
+		return $Lead;
 
 		// check if we've loaded the item into the collection already
 		// if yes, return it
-		if ( $this->contains( 'id', $Lead->get_id() ) && $Lead->get_id() != 0 ) {
-			return $this->where( 'id', $Lead->get_id() );
-		}
-
-		$this->add( $Lead );
-
-		return $this->last();
+//		if ( $this->contains( 'id', $Lead->get_id() ) && $Lead->get_id() != 0 ) {
+//			return $this->where( 'id', $Lead->get_id() );
+//		}
+//
+//		$this->add( $Lead );
+//
+//		return $this->last();
 	}
 
 	private function get_object( $Lead )
