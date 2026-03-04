@@ -72,9 +72,22 @@ class Form_Handler
 		return filter_input( INPUT_POST, $key, FILTER_UNSAFE_RAW );
 	}
 
-	static public function sanitize_form_data( $form_data )
+	static public function sanitize_form_data( $data )
 	{
-		return array_map( 'sanitize_text_field', $form_data );
+		if ( is_array( $data ) ) {
+
+			foreach ( $data as $key => $value ) {
+				$data[$key] = self::sanitize_form_data( $value );
+			}
+
+			return $data;
+		}
+
+		if ( is_string( $data ) ) {
+			return wp_kses_post( $data );
+		}
+
+		return $data;
 	}
 
 	static public function sanitize_input( $input )
@@ -120,5 +133,4 @@ class Form_Handler
 
 		return $result;
 	}
-
 }
