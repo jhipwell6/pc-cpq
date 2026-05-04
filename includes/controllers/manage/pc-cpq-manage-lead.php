@@ -66,7 +66,11 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 
 		$Lead = PC_CPQ()->lead( $lead_id );
 		$Lead->update_prop( 'quote_pricing_type', $send_quote_form['quote_pricing_type'] );
+		$Lead->update_prop( 'fees', $this->prepare_quote_fees( $send_quote_form ) );
 		PC_CPQ()->Quote( $Lead )->send_quote( $send_quote_form['recipients'] );
+		
+		// handle fees
+		
 
 		$html = PC_CPQ()->view( 'manage/partials/quote-details', array( 'Lead' => $Lead ) );
 		wp_send_json_success( array(
@@ -86,6 +90,7 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 		$Quote = PC_CPQ()->Quote( $Lead );
 
 		$Lead->update_prop( 'quote_pricing_type', $send_quote_form['quote_pricing_type'] );
+		$Lead->update_prop( 'fees', $this->prepare_quote_fees( $send_quote_form ) );
 
 		try {
 
@@ -127,6 +132,7 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 
 		$Lead = PC_CPQ()->lead( $lead_id );
 		$Lead->update_prop( 'quote_pricing_type', $preview_quote_form['quote_pricing_type'] );
+		$Lead->update_prop( 'fees', $this->prepare_quote_fees( $preview_quote_form ) );
 		$url = PC_CPQ()->Quote( $Lead )->get_preview_quote_url();
 
 		wp_send_json_success( array(
@@ -540,6 +546,17 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 				$i ++;
 			}
 		}
+	}
+
+	private function prepare_quote_fees( $form_data )
+	{
+		$selected_fees = isset( $form_data['selected_fees'] ) ? array_filter( (array) $form_data['selected_fees'] ) : array();
+
+		return array_map( function( $fee ) {
+			return array(
+				'fee' => $fee,
+			);
+		}, array_values( $selected_fees ) );
 	}
 }
 

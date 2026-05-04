@@ -27,7 +27,7 @@ class Nutshell_Service
 
 	public function maybe_send_lead( $entry, $form = null, $skip_validation = false )
 	{
-		$this->entry = $entry;
+		$this->entry = is_array( $entry ) ? $entry : array();
 
 		// bail if the lead is not valid
 		if ( ! $skip_validation ) {
@@ -36,7 +36,7 @@ class Nutshell_Service
 		}
 
 		// create the contact, account, and lead in Nutshell
-		$this->process_lead();
+		return $this->process_lead();
 	}
 
 	public function fix_lead_ids()
@@ -88,17 +88,27 @@ class Nutshell_Service
 
 	private function process_lead()
 	{
-		// create the contact
-		$this->create_contact();
+		try {
+			// create the contact
+			if ( ! $this->create_contact() )
+				return false;
 
-		// create the account
-		$this->create_account();
+			// create the account
+			if ( ! $this->create_account() )
+				return false;
 
-		// create the lead
-		$this->create_lead();
+			// create the lead
+			if ( ! $this->create_lead() )
+				return false;
 
-		// save the lead ids
-		$this->save_lead_ids();
+			// save the lead ids
+			$this->save_lead_ids();
+		} catch ( \NutshellApiException $e ) {
+			$this->log( 'Nutshell API error: ' . $e->getMessage() );
+			return false;
+		}
+
+		return true;
 	}
 
 	/*
@@ -111,24 +121,31 @@ class Nutshell_Service
 			'contact' => array()
 		);
 
-		$name = $this->get_prop( 1 ) . ' ' . $this->get_prop( 2 );
+		$name = $this->get_full_name();
 		$phone = $this->get_prop( 26 );
 		$email = $this->get_prop( 3 );
 
-		if ( $name && ( $name != '' || $name != ' ' ) ) {
+		if ( $name ) {
 			$params['contact']['name'] = $name;
 		}
 
-		if ( $phone && $phone != '' ) {
+		if ( $phone ) {
 			$params['contact']['phone'] = array( $phone );
 		}
 
-		if ( $email && $email != '' ) {
+		if ( $email ) {
 			$params['contact']['email'] = array( $email );
+		}
+
+		if ( empty( $params['contact'] ) ) {
+			$this->log( 'Skipped Nutshell contact creation because no contact fields were available.' );
+			return false;
 		}
 
 		$new_contact = $this->api->call( 'newContact', $params );
 		$this->new_contact_id = $new_contact->id;
+
+		return true;
 	}
 
 	/*
@@ -148,18 +165,29 @@ class Nutshell_Service
 			)
 		);
 
-		$name = $this->get_prop( 4 );
+		$name = $this->get_account_name();
 		$phone = $this->get_prop( 26 );
+		$email = $this->get_prop( 3 );
 
-		if ( $name && $name != '' ) {
+		if ( $name ) {
 			$params['account']['name'] = $name;
 		}
-		if ( $phone && $phone != '' ) {
+		if ( $phone ) {
 			$params['account']['phone'] = array( $phone );
+		}
+		if ( $email ) {
+			$params['account']['email'] = array( $email );
+		}
+
+		if ( ! $this->has_account_identity( $params['account'] ) ) {
+			$this->log( 'Skipped Nutshell account creation because no account identity fields were available.' );
+			return false;
 		}
 
 		$new_account = $this->api->call( 'newAccount', $params );
 		$this->new_account_id = $new_account->id;
+
+		return true;
 	}
 
 	/*
@@ -172,7 +200,6 @@ class Nutshell_Service
 		$params = array(
 			'lead' => array(
 				'primaryAccount' => array( 'id' => $this->new_account_id ),
-//				'name' => 'Q: ' . $this->Lead->get_quote_number(),
 				'confidence' => 70,
 				'contacts' => array(
 					array(
@@ -187,6 +214,8 @@ class Nutshell_Service
 		$new_lead = $this->api->call( 'newLead', $params );
 		$this->lead_id = $new_lead->id;
 		$this->nutshell_id = $this->format_lead_id( $new_lead );
+
+		return true;
 	}
 
 	private function save_lead_ids()
@@ -233,7 +262,86 @@ class Nutshell_Service
 
 	private function get_prop( $prop )
 	{
-		return rgar( $this->entry, $prop );
+		$value = is_array( $this->entry ) ? rgar( $this->entry, (string) $prop ) : '';
+		if ( $this->is_filled( $value ) ) {
+			return $this->clean_value( $value );
+		}
+
+		return $this->get_lead_prop( $prop );
+	}
+
+	private function get_lead_prop( $prop )
+	{
+		$field_map = array(
+			1 => 'get_first_name',
+			2 => 'get_last_name',
+			3 => 'get_email',
+			4 => 'get_company',
+			5 => 'get_business',
+			10 => 'get_finishing_type',
+			13 => 'get_notes',
+			26 => 'get_phone',
+		);
+
+		if ( isset( $field_map[$prop] ) && is_callable( array( $this->Lead, $field_map[$prop] ) ) ) {
+			return $this->clean_value( call_user_func( array( $this->Lead, $field_map[$prop] ) ) );
+		}
+
+		return '';
+	}
+
+	private function get_full_name()
+	{
+		return $this->clean_value( $this->get_prop( 1 ) . ' ' . $this->get_prop( 2 ) );
+	}
+
+	private function get_account_name()
+	{
+		$name = $this->get_prop( 4 );
+		if ( $name ) {
+			return $name;
+		}
+
+		if ( $this->Lead->has_customer() ) {
+			$Customer = $this->Lead->get_Customer();
+			if ( $Customer && $Customer->get_name() ) {
+				return $this->clean_value( $Customer->get_name() );
+			}
+		}
+
+		return $this->get_full_name();
+	}
+
+	private function has_account_identity( $account )
+	{
+		foreach ( array( 'name', 'phone', 'email', 'address', 'url' ) as $key ) {
+			if ( ! empty( $account[$key] ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	private function is_filled( $value )
+	{
+		return '' !== $this->clean_value( $value );
+	}
+
+	private function clean_value( $value )
+	{
+		if ( is_array( $value ) ) {
+			return array_filter( array_map( array( $this, 'clean_value' ), $value ) );
+		}
+
+		return trim( (string) $value );
+	}
+
+	private function log( $message )
+	{
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( sprintf( '[PC_CPQ Nutshell] lead_id=%d %s', (int) $this->post_id, $message ) );
+		}
 	}
 
 }

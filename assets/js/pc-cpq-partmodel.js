@@ -14,6 +14,8 @@ export function createPartModel( PC_CPQ_Helpers ) {
 		maxY: '', // computed
 		maxZ: '', // computed
 		baseMetal: '', // user-defined
+		priceUnit: '', // user-defined
+		quantities: [ ], // user-defined
 		processes: [ ], // user-defined
 		drawingNumber: '', // user-defined
 		revisionNumber: '', // user-defined
@@ -49,6 +51,34 @@ export function createPartModel( PC_CPQ_Helpers ) {
 				label: 'Part Number',
 				type: 'text',
 				col: '4'
+			},
+			{
+				name: 'priceUnit',
+				label: 'Pricing Unit',
+				type: 'select',
+				placeholder: 'Select pricing unit',
+				col: '12',
+				options: Object.entries( PC_CPQ_Config.parts.pricing_units || {} ).map( ( [ value, definition ] ) => {
+					return {
+						value,
+						label: definition.price_label
+					};
+				} )
+			},
+			{
+				name: 'quantities',
+				label: 'Quantity Breaks (in selected pricing unit)',
+				type: 'array',
+				col: '12',
+				fields: [
+					{
+						name: 'breakPoint',
+						label: 'Break Point',
+						type: 'number',
+						col: '6',
+						parent: 'quantities',
+					}
+				]
 			},
 			{
 				name: 'processes',
@@ -111,6 +141,8 @@ export function createPartModel( PC_CPQ_Helpers ) {
 			'dY',
 			'dZ',
 			'baseMetal',
+			'priceUnit',
+			'quantities',
 			'processes',
 			'drawingNumber',
 			'revisionNumber',
@@ -120,6 +152,8 @@ export function createPartModel( PC_CPQ_Helpers ) {
 			'ID',
 			'fileName',
 			'baseMetal',
+			'priceUnit',
+			'quantities',
 			'processes',
 			'drawingNumber',
 			'revisionNumber',
@@ -128,6 +162,7 @@ export function createPartModel( PC_CPQ_Helpers ) {
 
 		init() {
 			this.setPartID();
+			this.addItem( 'quantities' );
 			this.addItem( 'processes' );
 			this.setDimensions();
 		},
@@ -153,9 +188,15 @@ export function createPartModel( PC_CPQ_Helpers ) {
 
 			let newItems = [ ];
 			let item = { };
+			let current = JSON.parse( JSON.stringify( this[ field ] ) );
 			switch ( field ) {
+				case 'quantities':
+					item = [ {
+							breakPoint: '',
+						} ];
+					newItems = current.concat( item );
+					break;
 				case 'processes':
-					let current = JSON.parse( JSON.stringify( this[ field ] ) );
 					item = [ {
 							metal: '',
 							specification: '',
@@ -413,10 +454,12 @@ export function createPartModel( PC_CPQ_Helpers ) {
 		renderSelectInput( field, fieldId, fieldName, fieldValue, index = false ) {
 			// set options
 			let options = field.options.map( ( option ) => {
+				const optionValue = typeof option === 'object' ? option.value : option;
+				const optionLabel = typeof option === 'object' ? option.label : option;
 				const optionData = {
-					value: option,
-					label: option,
-					selected: fieldValue == option ? ' selected' : ''
+					value: optionValue,
+					label: optionLabel,
+					selected: fieldValue == optionValue ? ' selected' : ''
 				}
 				return PC_CPQ_Helpers.template( 'select-input-option', optionData );
 			} );
@@ -424,8 +467,9 @@ export function createPartModel( PC_CPQ_Helpers ) {
 			// set placeholder option if it exists
 			if ( field.hasOwnProperty( 'placeholder' ) ) {
 				const placeholder = PC_CPQ_Helpers.template( 'select-input-option', {
-					value: field.placeholder,
-					label: field.placeholder
+					value: '',
+					label: field.placeholder,
+					selected: fieldValue === '' ? ' selected' : ''
 				} );
 				options.unshift( placeholder );
 			}

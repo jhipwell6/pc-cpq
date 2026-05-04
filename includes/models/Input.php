@@ -139,6 +139,7 @@ class Input
 			'\PC_CPQ\Models\Settings\Barrel' => 'raw_barrels-',
 			'\PC_CPQ\Models\Settings\Rack' => 'raw_racks-',
 			'\PC_CPQ\Models\Settings\Operation' => 'raw_operations-',
+			'\PC_CPQ\Models\Settings\Fee' => 'raw_fees-',
 		];
 		
 		$prefix = '';

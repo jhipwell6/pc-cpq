@@ -50,7 +50,14 @@ class PC_CPQ_Template extends MVC_Controller_Registry
 	public function enqueue_assets()
 	{
 		if ( ! PC_CPQ()->Site()->is_manage() ) {
-			$script_version = filemtime( PC_CPQ()->plugin_path() . '/assets/js/pc-cpq-frontend.js' );
+			$frontend_asset_paths = [
+				'/assets/js/pc-cpq-frontend.js',
+				'/assets/js/pc-cpq-partmodel.js',
+				'/assets/js/pc-cpq-helpers.js',
+			];
+			$script_version = implode( '-', array_map( function ( $path ) {
+				return filemtime( PC_CPQ()->plugin_path() . $path );
+			}, $frontend_asset_paths ) );
 			wp_enqueue_style( 'bootstrap', PC_CPQ()->plugin_url() . '/assets/vendor/css/bootstrap.min.css' );
 			wp_enqueue_style( PC_CPQ_DOMAIN . '-styles', PC_CPQ()->plugin_url() . '/assets/css/pc-cpq-frontend.css' );
 			wp_enqueue_script( 'bootstrap-bundle', PC_CPQ()->plugin_url() . '/assets/vendor/js/bootstrap.bundle.js', [ 'jquery' ], '', true );

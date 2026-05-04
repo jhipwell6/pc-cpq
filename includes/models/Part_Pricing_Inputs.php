@@ -7,6 +7,32 @@ if ( ! defined( 'ABSPATH' ) )
 
 class Part_Pricing_Inputs
 {
+	const PRICE_UNITS = [
+		'ea' => [
+			'price_label' => 'Per Ea',
+			'quantity_label' => 'Ea',
+		],
+		'lb' => [
+			'price_label' => 'Per Lb',
+			'quantity_label' => 'Lbs',
+		],
+		'k' => [
+			'price_label' => 'Per K',
+			'quantity_label' => 'K',
+		],
+		'c' => [
+			'price_label' => 'Per C',
+			'quantity_label' => 'C',
+		],
+		'g' => [
+			'price_label' => 'Per G',
+			'quantity_label' => 'G',
+		],
+		'kg' => [
+			'price_label' => 'Per Kg',
+			'quantity_label' => 'Kg',
+		],
+	];
 	
 	protected $margin;
 	protected $eff;
@@ -67,7 +93,41 @@ class Part_Pricing_Inputs
 	
 	public function get_price_unit(): string
 	{
-		return (string) $this->get_prop( 'price_unit' );
+		return self::sanitize_price_unit( (string) $this->get_prop( 'price_unit' ) );
+	}
+
+	public function get_price_unit_label(): string
+	{
+		$definition = self::get_price_unit_definition( $this->get_price_unit() );
+		return $definition['price_label'];
+	}
+
+	public function get_quantity_unit_label(): string
+	{
+		$definition = self::get_price_unit_definition( $this->get_price_unit() );
+		return $definition['quantity_label'];
+	}
+
+	public static function get_price_unit_definition( string $value ): array
+	{
+		$unit = self::sanitize_price_unit( $value );
+		return self::PRICE_UNITS[$unit];
+	}
+
+	public static function get_price_units(): array
+	{
+		return self::PRICE_UNITS;
+	}
+
+	public static function sanitize_price_unit( string $value ): string
+	{
+		$value = strtolower( trim( $value ) );
+
+		if ( 'each' === $value || '' === $value ) {
+			return 'ea';
+		}
+
+		return array_key_exists( $value, self::PRICE_UNITS ) ? $value : 'ea';
 	}
 	
 	/*
@@ -125,6 +185,9 @@ class Part_Pricing_Inputs
 	
 	public function to_array( $exclude = array() )
 	{
-		return get_object_vars( $this );
+		$data = get_object_vars( $this );
+		unset( $data['raw_data'] );
+		$data['price_unit'] = $this->get_price_unit();
+		return array_diff_key( $data, array_flip( $exclude ) );
 	}
 }

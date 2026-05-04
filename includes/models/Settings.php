@@ -65,6 +65,12 @@ class Settings extends Abstract_Model
 	protected $Post_Operations;
 	protected $post_ops_order;
 	
+	/*
+	 * Fees
+	 */
+	protected static $Fee_Class = 'PC_CPQ\Models\Settings\Fee';
+	protected $raw_fees;
+	protected $Fees;
 
 	/*
 	 * Getters
@@ -328,6 +334,27 @@ class Settings extends Abstract_Model
 		return $this->get_prop( 'post_ops_order' );
 	}
 	
+	public function get_raw_fees()
+	{
+		if ( null === $this->raw_fees ) {
+			$this->raw_fees = $this->get_meta( 'fees' );
+		}
+		return $this->raw_fees;
+	}
+
+	public function get_Fees( $force_update = false )
+	{
+		if ( null === $this->Fees ) {
+			$this->Fees = array();
+			if ( ! empty( $this->get_raw_fees() ) ) {
+				foreach ( $this->get_raw_fees() as $index => $raw_fee ) {
+					$this->add_Fee( $index, $raw_fee, false );
+				}
+			}
+		}
+		return $this->Fees;
+	}
+	
 	/*
 	 * Setters
 	 */
@@ -445,6 +472,11 @@ class Settings extends Abstract_Model
 	public function set_raw_operations( $value )
 	{
 		return $this->set_prop( 'raw_operations', $value );
+	}
+	
+	public function set_raw_fees( $value )
+	{
+		return $this->set_prop( 'raw_fees', $value );
 	}
 	
 	public function set_post_ops_order( $value )
@@ -566,6 +598,22 @@ class Settings extends Abstract_Model
 		}, $this->get_Operations() );
 
 		$this->update_prop( 'raw_operations', $operations );
+	}
+	
+	public function save_raw_fees_meta( $value )
+	{
+		$result = update_field( 'fees', $value, 'option' );
+		$this->refresh_Fees();
+		return $result;
+	}
+
+	public function save_Fees()
+	{
+		$fees = array_map( function ( $Fee ) {
+			return $Fee->to_array();
+		}, $this->get_Fees() );
+
+		$this->update_prop( 'raw_fees', $fees );
 	}
 	
 	/*
@@ -801,6 +849,39 @@ class Settings extends Abstract_Model
 	public function refresh_Operations()
 	{
 		$this->get_Operations( true );
+	}
+	
+	public function get_Fees_count()
+	{
+		return count( $this->get_Fees() );
+	}
+
+	public function add_Fee( $index = null, $raw_fee = array(), $save = true )
+	{
+		if ( null === $index ) {
+			$index = $this->get_Fees_count();
+		}
+		$this->Fees[] = new self::$Fee_Class( $index, $raw_fee );
+
+		if ( $save ) {
+			$this->save_Fees();
+		}
+	}
+	
+	public function delete_Fee( $index )
+	{
+		$Fees = $this->get_Fees();
+		if ( isset( $Fees[$index] ) ) {
+			unset( $Fees[$index] );
+		}
+		$this->Fees = array_values( $Fees );
+
+		$this->save_Fees();
+	}
+	
+	public function refresh_Fees()
+	{
+		$this->get_Fees( true );
 	}
 
 	public function get_hidden()

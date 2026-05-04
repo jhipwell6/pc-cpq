@@ -66,6 +66,12 @@
 							</a>
 						</li>
 						<li class="nav-item">
+							<a href="<?php echo $Site->get_settings_page_url( 'fees' ); ?>" class="nav-link">
+								<i class="far fa-circle nav-icon"></i>
+								<p>Fee Settings</p>
+							</a>
+						</li>
+						<li class="nav-item">
 							<a href="<?php echo $Site->get_settings_page_url( 'templates' ); ?>" class="nav-link">
 								<i class="far fa-circle nav-icon"></i>
 								<p>Templates</p>

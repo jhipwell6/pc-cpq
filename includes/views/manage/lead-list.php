@@ -59,6 +59,17 @@
 			</thead>
 			<tbody>
 				<?php foreach ( $leads as $Lead ) : ?>
+					<?php
+					$status = $Lead->get_status();
+					$status_badge_classes = [
+						'New' => 'badge-primary',
+						'Quoted' => 'badge-success',
+						'Canceled' => 'badge-danger',
+						'Pending' => 'badge-warning',
+						'No Quote' => 'badge-secondary',
+					];
+					$status_badge_class = $status_badge_classes[ $status ] ?? 'badge-light';
+					?>
 					<tr data-type="lead" data-id="<?php echo $Lead->get_id(); ?>">
 						<td>
 							# <?php echo $Lead->get_quote_number(); ?>
@@ -92,7 +103,7 @@
 							<?php echo $Lead->get_stage(); ?>
 						</td>
 						<td class="project-state">
-							<span class="badge badge-success"><?php echo $Lead->get_status(); ?></span>
+							<span class="badge <?php echo $status_badge_class; ?>"><?php echo $status; ?></span>
 						</td>
 						<td class="project-actions text-right">
 							<a class="btn btn-primary btn-sm" href="<?php echo $Lead->get_manage_url(); ?>">

@@ -236,7 +236,7 @@ class PC_CPQ_Manage extends MVC_Controller_Registry
 		$args = [
 			'post_type' => 'customer',
 			'posts_per_page' => 20,
-			'orderby' => 'date',
+			'orderby' => 'ID',
 			'order' => 'DESC',
 			'paged' => $offset,
 		];
@@ -244,29 +244,6 @@ class PC_CPQ_Manage extends MVC_Controller_Registry
 		if ( isset( $_GET['q'] ) ) {
 			$search_term = sanitize_text_field( $_GET['q'] );
 			$args['s'] = $search_term;
-//			$args['meta_query'] = [
-//				'relation' => 'OR',
-//				[
-//					'key' => 'customer_code',
-//					'value' => $search_term,
-//					'compare' => 'LIKE',
-//				],
-//				[
-//					'key' => 'first_name',
-//					'value' => $search_term,
-//					'compare' => 'LIKE',
-//				],
-//				[
-//					'key' => 'last_name',
-//					'value' => $search_term,
-//					'compare' => 'LIKE',
-//				],
-//				[
-//					'key' => 'email',
-//					'value' => $search_term,
-//					'compare' => 'LIKE',
-//				],
-//			];
 		}
 		
 		$customers = new \WP_Query( $args );

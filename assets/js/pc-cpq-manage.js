@@ -511,6 +511,14 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 						metalMaterial: type == 'Prep' ? baseMetal : material
 					};
 					break;
+				case 'fee':
+					data = {
+						name: row.find( 'input[name="raw_fees/' + index + '/name"]' ).val(),
+						amount: row.find( 'input[name="raw_fees/' + index + '/amount"]' ).val(),
+						unit: row.find( 'select[name="raw_fees/' + index + '/unit"]' ).val() == 'percent' ? '%' : '$',
+						enabledByDefault: row.find( 'input[name="raw_fees/' + index + '/enabled_by_default"]' ).is( ':checked' ) ? 'Yes' : '-',
+					};
+					break;
 			}
 			return data;
 		},
@@ -658,6 +666,8 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 			this.bind();
 			this.checkCanSendQuote();
 			this.updateAllOperationData();
+			this.initProcessSortable();
+			this.initOperationSortable();
 			this.initPlatingToolInputs();
 			this.customerLookup();
 //			this.renderStepFiles();
@@ -696,6 +706,7 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 			$( document ).on( 'click', '.js-send-to-nutshell', $.proxy( this.sendToNutshell, this ) );
 
 			$( document ).on( 'click', '.js-save-customer', $.proxy( this.saveCustomer, this ) );
+			$( document ).on( 'change', 'select[name^="raw_parts/"][name$="/metal"]', $.proxy( this.updateProcessMetalData, this ) );
 		},
 
 		onInputChange( e ) {
@@ -768,6 +779,8 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 				PC_CPQ_Manage.Common.initTooltips();
 				PC_CPQ_Manage.Common.initSelect2();
 				PC_CPQ_Manage.Common.convertUnits();
+				this.initProcessSortable();
+				this.initOperationSortable();
 			} ) );
 		},
 
@@ -799,6 +812,8 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 				PC_CPQ_Manage.Common.initFileUploader();
 				PC_CPQ_Manage.Common.initTooltips();
 				PC_CPQ_Manage.Common.convertUnits();
+				this.initProcessSortable();
+				this.initOperationSortable();
 			} ) );
 		},
 
@@ -817,6 +832,8 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 				PC_CPQ_Manage.Common.initFileUploader();
 				PC_CPQ_Manage.Common.initTooltips();
 				PC_CPQ_Manage.Common.convertUnits();
+				this.initProcessSortable();
+				this.initOperationSortable();
 			} ) );
 		},
 
@@ -874,10 +891,38 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 		updateProcessRows( partNumber ) {
 			$( 'tr[data-type="process"][data-part-index="' + partNumber + '"]' ).each( ( i, el ) => {
 				let index = $( el ).data( 'index' );
-				let partIndex = $( el ).data( 'part-index' );
-				let value = $( el ).next().find( '[name="raw_parts/' + partIndex + '/processes/' + index + '/metal"]' ).val();
-				$( el ).find( '[data-model="metal"]' ).text( value );
+				this.syncProcessMetalDisplay( $( el ), index );
 			} );
+		},
+
+		updateProcessMetalData( e ) {
+			const $select = $( e.currentTarget );
+			const matches = $select.attr( 'name' ).match( /raw_parts\/(\d+)\/processes\/(\d+)\/metal$/ );
+			if ( ! matches ) {
+				return;
+			}
+
+			const partIndex = parseInt( matches[1], 10 );
+			const processIndex = parseInt( matches[2], 10 );
+			const $row = $( 'tr[data-type="process"][data-part-index="' + partIndex + '"][data-index="' + processIndex + '"]' );
+
+			if ( ! $row.length ) {
+				return;
+			}
+
+			this.syncProcessMetalDisplay( $row, processIndex );
+		},
+
+		syncProcessMetalDisplay( $row, processIndex = null ) {
+			const partIndex = $row.data( 'part-index' );
+			const index = processIndex !== null ? processIndex : $row.data( 'index' );
+			const $detail = $row.next( '.js-process-detail-row' );
+			const $select = $detail.find( '[name="raw_parts/' + partIndex + '/processes/' + index + '/metal"]' );
+			const value = $select.val() || '';
+
+			$row.attr( 'data-metal', value );
+			$detail.attr( 'data-metal', value );
+			$row.find( '[data-model="metal"]' ).text( value );
 		},
 
 		getCopiedProcess( forceUpdate = false ) {
@@ -1078,6 +1123,8 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 
 				PC_CPQ_Manage.Form.fetch( data, ( ( response ) => {
 					$( '#lead-parts' ).html( response.data.html );
+					this.initProcessSortable();
+					this.initOperationSortable();
 				} ) );
 			}
 		},
@@ -1132,6 +1179,8 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 
 			PC_CPQ_Manage.Form.fetch( data, ( ( response ) => {
 				$( '#part_' + response.data.i + '_processes' ).html( response.data.html );
+				this.initProcessSortable();
+				this.initOperationSortable();
 				$( document ).trigger( 'pc_cpq_process_step_added' );
 			} ) );
 		},
@@ -1154,8 +1203,217 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 
 				PC_CPQ_Manage.Form.fetch( data, ( ( response ) => {
 					$( '#part_' + response.data.i + '_processes' ).html( response.data.html );
+					this.initProcessSortable();
+					this.initOperationSortable();
 				} ) );
 			}
+		},
+
+		initProcessSortable() {
+			$( '.js-part-processes-table tbody' ).each( ( i, tbody ) => {
+				const $tbody = $( tbody );
+				if ( $tbody.data( 'sortable-initialized' ) ) {
+					return;
+				}
+
+				const sortable = new Sortable( tbody, {
+					handle: '.js-process-sort-handle',
+					draggable: 'tr[data-type="process"]',
+					animation: 150,
+					forceFallback: true,
+					fallbackOnBody: true,
+					fallbackTolerance: 5,
+					onEnd: () => {
+						this.reorderProcessRows( $tbody );
+					}
+				} );
+
+				$tbody.data( 'sortable-instance', sortable );
+				$tbody.data( 'sortable-initialized', true );
+			} );
+		},
+
+		initOperationSortable() {
+			$( '.js-part-operations-table tbody' ).each( ( i, tbody ) => {
+				const $tbody = $( tbody );
+				if ( $tbody.data( 'sortable-initialized' ) ) {
+					return;
+				}
+
+				const sortable = new Sortable( tbody, {
+					handle: '.js-operation-sort-handle',
+					draggable: 'tr[data-type="routing"][data-sortable="1"]',
+					animation: 150,
+					forceFallback: true,
+					fallbackOnBody: true,
+					fallbackTolerance: 5,
+					onEnd: () => {
+						this.reorderOperationRows( $tbody );
+					}
+				} );
+
+				$tbody.data( 'sortable-instance', sortable );
+				$tbody.data( 'sortable-initialized', true );
+			} );
+		},
+
+		reorderProcessRows( $tbody ) {
+			const partIndex = $tbody.data( 'part-index' );
+			$tbody.find( 'select.select2-hidden-accessible' ).each( ( i, select ) => {
+				$( select ).select2( 'destroy' );
+			} );
+			const rowPairs = [ ];
+
+			$tbody.children( 'tr[data-type="process"]' ).each( ( i, row ) => {
+				const $row = $( row );
+				const detailId = $row.attr( 'data-detail-id' );
+				const $detail = $tbody.children( '#' + detailId );
+				rowPairs.push( {
+					$row,
+					$detail
+				} );
+			} );
+
+			$tbody.empty();
+
+			rowPairs.forEach( ( pair, newIndex ) => {
+				this.renumberProcessRowPair( pair.$row, pair.$detail, partIndex, newIndex );
+				$tbody.append( pair.$row, pair.$detail );
+			} );
+
+			PC_CPQ_Manage.Common.initSelect2();
+			this.updateProcessRows( partIndex );
+			$( document ).trigger( 'spc-change' );
+		},
+
+		reorderProcessRowsByOriginalIndexes( partIndex, orderedProcessIndexes ) {
+			if ( ! orderedProcessIndexes.length ) {
+				return;
+			}
+
+			const $tbody = $( '#part_' + partIndex + '_processes .js-part-processes-table tbody' );
+			if ( ! $tbody.length ) {
+				return;
+			}
+
+			$tbody.find( 'select.select2-hidden-accessible' ).each( ( i, select ) => {
+				$( select ).select2( 'destroy' );
+			} );
+
+			const rowPairsByIndex = { };
+			$tbody.children( 'tr[data-type="process"]' ).each( ( i, row ) => {
+				const $row = $( row );
+				const oldIndex = parseInt( $row.attr( 'data-index' ), 10 );
+				const detailId = $row.attr( 'data-detail-id' );
+				rowPairsByIndex[oldIndex] = {
+					$row,
+					$detail: $tbody.children( '#' + detailId )
+				};
+			} );
+
+			const rowPairs = orderedProcessIndexes.map( ( oldIndex ) => rowPairsByIndex[oldIndex] ).filter( ( pair ) => pair );
+			if ( rowPairs.length !== Object.keys( rowPairsByIndex ).length ) {
+				return;
+			}
+
+			$tbody.empty();
+
+			rowPairs.forEach( ( pair, newIndex ) => {
+				this.renumberProcessRowPair( pair.$row, pair.$detail, partIndex, newIndex );
+				$tbody.append( pair.$row, pair.$detail );
+			} );
+
+			PC_CPQ_Manage.Common.initSelect2();
+			this.updateProcessRows( partIndex );
+			$( document ).trigger( 'spc-change' );
+		},
+
+		reorderOperationRows( $tbody ) {
+			const partIndex = $tbody.data( 'part-index' );
+			const rowPairs = [ ];
+			const orderedProcessIndexes = [ ];
+
+			$tbody.children( 'tr[data-type="routing"]' ).each( ( i, row ) => {
+				const $row = $( row );
+				const detailId = $row.attr( 'data-detail-id' );
+				const $detail = detailId ? $tbody.children( '#' + detailId ) : $( [] );
+				const processIndex = $row.attr( 'data-process-index' );
+
+				if ( $row.attr( 'data-sortable' ) === '1' && processIndex !== '' ) {
+					orderedProcessIndexes.push( parseInt( processIndex, 10 ) );
+				}
+
+				rowPairs.push( {
+					$row,
+					$detail
+				} );
+			} );
+
+			$tbody.empty();
+
+			rowPairs.forEach( ( pair, newIndex ) => {
+				this.renumberOperationRowPair( pair.$row, pair.$detail, partIndex, newIndex );
+				$tbody.append( pair.$row );
+				if ( pair.$detail.length ) {
+					$tbody.append( pair.$detail );
+				}
+			} );
+
+			this.reorderProcessRowsByOriginalIndexes( partIndex, orderedProcessIndexes );
+		},
+
+		renumberProcessRowPair( $row, $detail, partIndex, newIndex ) {
+			const oldIndex = parseInt( $row.attr( 'data-index' ), 10 );
+			const detailId = 'manage-part-' + partIndex + '-process-details-' + newIndex;
+
+			$row.attr( 'data-index', newIndex )
+					.attr( 'data-detail-id', detailId )
+					.find( 'td:eq(1)' ).text( ( newIndex + 1 ) + '.' );
+
+			$detail.attr( 'id', detailId )
+					.attr( 'data-index', newIndex );
+
+			$row.find( '.js-delete-part-process' ).attr( 'data-index', newIndex );
+			$row.find( '[data-toggle="collapse"]' )
+					.attr( 'data-target', '#' + detailId )
+					.attr( 'aria-controls', detailId );
+
+			const attrNames = [ 'name', 'id', 'for', 'data-target', 'aria-controls' ];
+			[ $row, $detail ].forEach( ( $element ) => {
+				$element.find( '*' ).addBack().each( ( i, el ) => {
+					const $el = $( el );
+					attrNames.forEach( ( attrName ) => {
+						const attrValue = $el.attr( attrName );
+						if ( ! attrValue ) {
+							return;
+						}
+						$el.attr( attrName, this.replaceProcessIndexReferences( attrValue, partIndex, oldIndex, newIndex ) );
+					} );
+				} );
+			} );
+		},
+
+		renumberOperationRowPair( $row, $detail, partIndex, newIndex ) {
+			const detailId = 'manage-part-' + partIndex + '-routing-details-' + newIndex;
+
+			$row.attr( 'data-index', newIndex ).find( 'td:eq(1)' ).text( ( newIndex + 1 ) + '.' );
+
+			if ( $detail.length ) {
+				$detail.attr( 'id', detailId ).attr( 'data-index', newIndex );
+				$detail.find( '.js-part-operation' ).attr( 'data-index', newIndex );
+			}
+
+			$row.attr( 'data-detail-id', detailId );
+			$row.find( '[data-toggle="collapse"]' )
+					.attr( 'data-target', '#' + detailId )
+					.attr( 'aria-controls', detailId );
+		},
+
+		replaceProcessIndexReferences( value, partIndex, oldIndex, newIndex ) {
+			return value
+				.replace( new RegExp( 'raw_parts/' + partIndex + '/processes/' + oldIndex + '(?=/)', 'g' ), 'raw_parts/' + partIndex + '/processes/' + newIndex )
+				.replace( new RegExp( 'raw_parts_' + partIndex + '_processes_' + oldIndex + '(?=_)', 'g' ), 'raw_parts_' + partIndex + '_processes_' + newIndex )
+				.replace( new RegExp( 'manage-part-' + partIndex + '-process-details-' + oldIndex + '\\b', 'g' ), 'manage-part-' + partIndex + '-process-details-' + newIndex );
 		},
 
 		addPartOperation( e ) {
@@ -1489,7 +1747,7 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 				const ID = $( e.currentTarget ).data( 'id' );
 				const data = {
 					action: 'delete_customer',
-					lead_id: ID
+					customer_id: ID
 				};
 
 				PC_CPQ_Manage.Form.fetch( data, ( ( response ) => {
@@ -1581,6 +1839,7 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 			$( document ).on( 'submit', '.js-edit-settings-plating-form', $.proxy( this.editSettingsPlating, this ) );
 			$( document ).on( 'submit', '.js-edit-settings-processes-form', $.proxy( this.editSettingsProcesses, this ) );
 			$( document ).on( 'submit', '.js-edit-settings-templates-form', $.proxy( this.editSettingsTemplates, this ) );
+			$( document ).on( 'submit', '.js-edit-settings-fees-form', $.proxy( this.editSettingsFees, this ) );
 			$( document ).on( 'click', '.js-add-email-template', $.proxy( this.addEmailTemplate, this ) );
 			$( document ).on( 'click', '.js-delete-email-template', $.proxy( this.deleteEmailTemplate, this ) );
 			$( document ).on( 'click', '.js-add-metal', $.proxy( this.addMetal, this ) );
@@ -1595,6 +1854,8 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 			$( document ).on( 'click', '.js-delete-rack', $.proxy( this.deleteRack, this ) );
 			$( document ).on( 'click', '.js-add-operation', $.proxy( this.addOperation, this ) );
 			$( document ).on( 'click', '.js-delete-operation', $.proxy( this.deleteOperation, this ) );
+			$( document ).on( 'click', '.js-add-fee', $.proxy( this.addFee, this ) );
+			$( document ).on( 'click', '.js-delete-fee', $.proxy( this.deleteFee, this ) );
 			$( document ).on( 'submit', '.js-import-settings-file-form', $.proxy( this.importSettings, this ) );
 			$( document ).on( 'click', '.js-export-settings', $.proxy( this.exportSettings, this ) );
 			$( document ).on( 'change', 'select[name^="raw_operations/"][name$="/type"]', $.proxy( this.toggleMetalMaterialInput, this ) );
@@ -1673,6 +1934,14 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 				PC_CPQ_Manage.Common.initWpEditor( 'quote_footer' );
 				PC_CPQ_Manage.Common.initWpEditor( 'quote_terms' );
 				this.refreshEmailTemplateWpEditors();
+			} ) );
+		},
+		
+		editSettingsFees( e ) {
+			e.preventDefault();
+			const rawData = $( e.target ).serialize();
+			PC_CPQ_Manage.Form.save( 'edit_settings_fees', 'edit_settings_fees_form', rawData, ( ( response ) => {
+				$( '#edit-settings-fees' ).html( response.data.html );
 			} ) );
 		},
 
@@ -1908,6 +2177,38 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 
 		getLiveOperations() {
 			return $( '[name^="raw_operations"]' ).serialize();
+		},
+		
+		addFee() {
+			const liveData = this.getLiveFees();
+			const data = {
+				action: 'add_fee',
+				live_fees: liveData
+			};
+
+			PC_CPQ_Manage.Form.fetch( data, ( ( response ) => {
+				$( '#fees' ).html( response.data.html );
+				$( '[data-target="#fee-modal-' + response.data.feesCount + '"]' ).click();
+			} ) );
+		},
+
+		deleteFee( e ) {
+			if ( confirm( 'Are you sure you want to delete this fee?' ) == true ) {
+				const liveData = this.getLiveFees();
+				const data = {
+					action: 'delete_fee',
+					index: $( e.currentTarget ).data( 'index' ),
+					live_fees: liveData
+				};
+
+				PC_CPQ_Manage.Form.fetch( data, ( ( response ) => {
+					$( '#fees' ).html( response.data.html );
+				} ) );
+			}
+		},
+
+		getLiveFees() {
+			return $( '[name^="raw_fees"]' ).serialize();
 		},
 
 		refreshOperationWpEditors() {

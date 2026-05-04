@@ -9,6 +9,7 @@ use \PC_CPQ\Helpers\Access;
 use \PC_CPQ\Helpers\Geometry;
 use \PC_CPQ\Helpers\Utilities;
 use PC_CPQ\Models\Customer;
+use PC_CPQ\Models\Part_Pricing_Inputs;
 
 if ( ! defined( 'ABSPATH' ) )
 	exit;
@@ -66,8 +67,10 @@ class PC_CPQ_Forms extends MVC_Controller_Registry
 		if ( $form['id'] == self::QUOTE_FORM_ID ) {
 			$created_posts = gform_get_meta( $entry['id'], 'gravityformsadvancedpostcreation_post_id' );
 			if ( ! empty( $created_posts ) ) {
-				$Lead = PC_CPQ()->lead( array_first( $created_posts ) );
+				$post_id = array_first( $created_posts );
+				$Lead = PC_CPQ()->lead( $post_id );
 				if ( ! $Lead->has_customer() || ( $Lead->has_customer() && ! $Lead->get_Customer()->has_completed_profile() ) ) {
+					$this->save_customer_data( $post_id, null, $entry, $form );
 					$confirmation = array(
 						'redirect' => $this->get_company_redirect_url( $Lead )
 					);
@@ -84,20 +87,17 @@ class PC_CPQ_Forms extends MVC_Controller_Registry
 			$customer_id = rgar( $entry, 5 );
 			if ( $customer_id ) {
 				$Customer = PC_CPQ()->customer( $customer_id );
-				$billing = array(
-					'street_address' => rgar( $entry, '4.1' ),
-					'street_address_2' => rgar( $entry, '4.2' ),
-					'city' => rgar( $entry, '4.3' ),
-					'state' => rgar( $entry, '4.4' ),
-					'zip' => rgar( $entry, '4.5' ),
-					'country' => rgar( $entry, '4.6' ),
-				);
 				$data = array(
 					'name' => rgar( $entry, 1 ),
 					'website' => rgar( $entry, 3 ),
 					'phone' => rgar( $entry, 6 ),
 					'fax' => rgar( $entry, 7 ),
-					'billing' => array_filter( $billing )
+					'billing_street_address' => rgar( $entry, '4.1' ),
+					'billing_street_address_2' => rgar( $entry, '4.2' ),
+					'billing_city' => rgar( $entry, '4.3' ),
+					'billing_state' => rgar( $entry, '4.4' ),
+					'billing_zip' => rgar( $entry, '4.5' ),
+					'billing_country' => rgar( $entry, '4.6' ),
 				);
 
 				$data = array_filter( $data );
@@ -172,6 +172,7 @@ class PC_CPQ_Forms extends MVC_Controller_Registry
 			$i = 0;
 			foreach ( $parts as $part_arr ) {
 				$data[$i] = array();
+				$pricing = [];
 				foreach ( $part_arr as $key => $value ) {
 					$new_key = Utilities::decamelize( $key );
 					switch ( $new_key ) {
@@ -216,8 +217,30 @@ class PC_CPQ_Forms extends MVC_Controller_Registry
 								}, $value );
 							}
 							break;
+
+						case 'quantities':
+							if ( ! empty( $value ) ) {
+								$value = array_values( array_filter( array_map( function ( $quantity ) {
+									if ( ! isset( $quantity['breakPoint'] ) || '' === $quantity['breakPoint'] ) {
+										return null;
+									}
+
+									return [
+										'break_point' => $quantity['breakPoint'],
+									];
+								}, $value ) ) );
+							}
+							break;
+
+						case 'price_unit':
+							$pricing['price_unit'] = Part_Pricing_Inputs::sanitize_price_unit( (string) $value );
+							continue 2;
 					}
 					$data[$i][$new_key] = $value;
+				}
+
+				if ( ! empty( $pricing ) ) {
+					$data[$i]['pricing'] = $pricing;
 				}
 				$i ++;
 			}
@@ -253,6 +276,10 @@ class PC_CPQ_Forms extends MVC_Controller_Registry
 			$Lead = PC_CPQ()->lead( $post_id );
 			if ( ! empty( $Lead->get_Parts() ) ) {
 				foreach ( $Lead->get_Parts() as $Part ) {
+					if ( ! empty( $Part->get_Quantities() ) ) {
+						continue;
+					}
+
 					$i = 0;
 					foreach ( $quantities as $quantity ) {
 						$Part->add_Quantity( $i, [ 'break_point' => $quantity ], false );
@@ -282,14 +309,25 @@ class PC_CPQ_Forms extends MVC_Controller_Registry
 
 	public function save_customer_data( $post_id, $feed, $entry, $form )
 	{
-		$company = rgar( $entry, 4 );
+		$Customer = false;
+		$match_type = 'none';
+		$company = trim( (string) rgar( $entry, 4 ) );
+		$email = trim( (string) rgar( $entry, 3 ) );
 		if ( $company ) {
 			$Customer = Customer::get_customer_by( 'name', $company );
+			if ( $Customer ) {
+				$match_type = 'company';
+			}
 		}
 		
-		if ( ! $Customer ) {
-			$email = rgar( $entry, 3 );
+		// Only fall back to email when no company was supplied.
+		// The same contact can submit quotes for multiple companies, and
+		// matching by email in that case can attach a new lead to the wrong customer.
+		if ( ! $Customer && ! $company ) {
 			$Customer = Customer::get_customer_by( 'email', $email );
+			if ( $Customer ) {
+				$match_type = 'email';
+			}
 		}
 		
 		if ( ! $Customer ) {
@@ -299,10 +337,29 @@ class PC_CPQ_Forms extends MVC_Controller_Registry
 				'phone' => rgar( $entry, 26 ),
 			] );
 			$Customer = $CustomerModel->save();
+			$match_type = 'created';
 		}
+
+		$this->log_customer_assignment( $post_id, $Customer, $match_type, $company, $email );
 		
 		$this->update_customer_contacts( $entry, $Customer );
 		$this->assign_customer_to_lead( $post_id, $Customer );
+	}
+
+	private function log_customer_assignment( $lead_id, \PC_CPQ\Models\Customer $Customer, $match_type, $company, $email )
+	{
+		if ( ! defined( 'WP_DEBUG' ) || ! WP_DEBUG ) {
+			return;
+		}
+
+		error_log( sprintf(
+			'[PC_CPQ customer assignment] lead_id=%d customer_id=%d match=%s company="%s" email="%s"',
+			(int) $lead_id,
+			(int) $Customer->get_id(),
+			sanitize_key( $match_type ),
+			sanitize_text_field( (string) $company ),
+			sanitize_email( (string) $email )
+		) );
 	}
 
 	private function update_customer_contacts( $entry, \PC_CPQ\Models\Customer $Customer )

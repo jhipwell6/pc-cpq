@@ -1,17 +1,21 @@
-<table class="table table-striped table-collapsing mb-0">
+<table class="table table-striped table-collapsing mb-0 js-part-processes-table">
 	<thead>
 		<tr>
+			<th style="width: 40px"></th>
 			<th style="width: 10px">#</th>
 			<th>Process</th>
 			<th></th>
 		</tr>
 	</thead>
-	<tbody>
+	<tbody data-part-index="<?php echo $i; ?>">
 		<?php
 		$p = 0;
 		foreach ( $Part->get_Processes() as $Process ) :
 			?>
-			<tr data-type="process" data-index="<?php echo $p; ?>" data-part-index="<?php echo $i; ?>">
+			<tr data-type="process" data-index="<?php echo $p; ?>" data-part-index="<?php echo $i; ?>" data-detail-id="manage-part-<?php echo $i; ?>-process-details-<?php echo $p; ?>">
+				<td class="text-center align-middle js-process-sort-handle" title="Drag to reorder" style="cursor: move;">
+					<i class="fas fa-grip-vertical text-muted"></i>
+				</td>
 				<td style="width: 10px"><?php echo $p + 1; ?>.</td>
 				<td data-model="metal"><?php echo $Process->get_metal(); ?></td>
 				<td class="text-right py-0 align-middle">
@@ -21,8 +25,8 @@
 					</div>
 				</td>
 			</tr>
-			<tr class="collapse" id="manage-part-<?php echo $i; ?>-process-details-<?php echo $p; ?>">
-				<td colspan="4">
+			<tr class="collapse js-process-detail-row" id="manage-part-<?php echo $i; ?>-process-details-<?php echo $p; ?>" data-index="<?php echo $p; ?>" data-part-index="<?php echo $i; ?>">
+				<td colspan="5">
 					<div class="p-4">
 						<?php
 						echo pc_cpq_get_input_html( 'metal', $Process, [ $i, $p ] );

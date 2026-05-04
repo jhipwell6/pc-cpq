@@ -57,6 +57,7 @@ class Lead extends Post_Model
 	protected $form_entry_id;
 	protected $sent;
 	protected $no_quote_email_message;
+	protected $fees;
 	protected $recipient;
 	protected static $Part_Class = 'PC_CPQ\Models\Part';
 	protected $raw_parts;
@@ -292,6 +293,11 @@ class Lead extends Post_Model
 	{
 		return $this->get_prop( 'recipient' );
 	}
+	
+	public function get_fees()
+	{
+		return $this->get_prop( 'fees' );
+	}
 
 	public function get_raw_parts()
 	{
@@ -484,6 +490,11 @@ class Lead extends Post_Model
 	public function set_no_quote_email_message( $value )
 	{
 		return $this->set_prop( 'no_quote_email_message', $value );
+	}
+	
+	public function set_fees( $value )
+	{
+		return $this->set_prop( 'fees', $value );
 	}
 
 	public function set_raw_parts( $value )

@@ -145,14 +145,14 @@
 	</div>
 	<?php if ( is_array( $Part->get_Pricing_Model() ) && ! empty( $Part->get_Pricing_Model() ) ) : ?>
 	<div class="row">
-		<div class="col-6">
+		<div class="col-12">
 			<h4 class="h6 text-uppercase mt-3">Special Pricing</h4>
 			<?php 
 				$price_prefix = '';
 				include PC_CPQ()->plugin_path() . '/includes/views/manage/partials/part-pricing-table.php'; 
 			?>
 		</div>
-		<div class="col-6">
+		<div class="col-12">
 			<h4 class="h6 text-uppercase mt-3">Commodity Pricing</h4>
 			<?php 
 				$price_prefix = 'base_';

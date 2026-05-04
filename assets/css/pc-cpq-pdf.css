@@ -37,25 +37,54 @@ table .pc-cpq-col--item {
 	width: 10%;
 }
 
+table .pc-cpq-col--details {
+	width: 90%;
+}
+
 table .pc-cpq-col--desc {
-	width: 60%;
+	width: 70%;
 }
 
 .has-metal-factor .pc-cpq-col--desc {
-	width: 40%;
+	width: 70%;
 }
 
 table .pc-cpq-col--qty {
-	width: 15%;
+	width: 50%;
 }
 
 table .pc-cpq-col--factor {
-	width: 20%;
+	width: 30%;
 }
 
 table .pc-cpq-col--price {
-	width: 15%;
+	width: 50%;
 	text-align: right !important;
+}
+
+.parts-table td,
+.parts-table th {
+	padding: 6px;
+}
+
+.parts-table__nested {
+	border-collapse: collapse;
+}
+
+.parts-table__nested th,
+.parts-table__nested td {
+	padding: 4px 6px;
+	border: none;
+}
+
+.parts-table__nested-head th {
+	padding-top: 8px;
+	border-top: 1px solid #ccc;
+}
+
+.parts-table__nested tbody tr:first-child th {
+	padding-top: 0;
+	border-top: none;
 }
 
 table .pc-cpq-col--opsdesc {

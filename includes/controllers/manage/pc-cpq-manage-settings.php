@@ -24,6 +24,7 @@ class PC_CPQ_Manage_Settings extends MVC_Controller_Registry
 		add_action( 'wp_ajax_edit_settings_plating', array( $this, 'edit_settings_plating' ) );
 		add_action( 'wp_ajax_edit_settings_processes', array( $this, 'edit_settings_processes' ) );
 		add_action( 'wp_ajax_edit_settings_templates', array( $this, 'edit_settings_templates' ) );
+		add_action( 'wp_ajax_edit_settings_fees', array( $this, 'edit_settings_fees' ) );
 		
 		// handle email templates
 		add_action( 'wp_ajax_add_email_template', array( $this, 'add_email_template' ) );
@@ -52,6 +53,10 @@ class PC_CPQ_Manage_Settings extends MVC_Controller_Registry
 		// handle operations
 		add_action( 'wp_ajax_add_operation', array( $this, 'add_operation' ) );
 		add_action( 'wp_ajax_delete_operation', array( $this, 'delete_operation' ) );
+		
+		// handle fees
+		add_action( 'wp_ajax_add_fee', array( $this, 'add_fee' ) );
+		add_action( 'wp_ajax_delete_fee', array( $this, 'delete_fee' ) );
 		
 		// handle imports & exports
 		add_action( 'wp_ajax_import_settings', array( $this, 'import_settings' ) );
@@ -183,6 +188,27 @@ class PC_CPQ_Manage_Settings extends MVC_Controller_Registry
 		}
 		
 		$this->render_settings_for_js( 'templates', $Settings );
+	}
+	
+	public function edit_settings_fees()
+	{
+		// Get form data
+		$edit_settings_fees_form = Form_Handler::get_form_data( 'edit_settings_fees_form' );
+		
+		// Check for valid form data, bail if invalid
+		Form_Handler::validate_form_data( $edit_settings_fees_form );
+
+		// Check for valid form action and nonce, bail if invalid
+		Form_Handler::pre_validate_form( 'edit_settings_fees_nonce', 'edit_settings_fees', $edit_settings_fees_form );
+
+		// Save the data
+		$Settings = PC_CPQ()->Settings();
+		$this->process_settings_data( $edit_settings_fees_form );
+		foreach ( $edit_settings_fees_form as $field => $value ) {
+			$Settings->update_prop( $field, $value );
+		}
+		
+		$this->render_settings_for_js( 'fees', $Settings );
 	}
 	
 	private function render_settings_for_js( $page, $Settings )
@@ -502,6 +528,50 @@ class PC_CPQ_Manage_Settings extends MVC_Controller_Registry
 		$Settings->refresh_Operations();
 	}
 	
+	public function add_fee()
+	{
+		$Settings = PC_CPQ()->Settings();
+		
+		// handle existing fees
+		$this->refresh_fee_data( $Settings );
+		
+		// add new fee
+		$Settings->add_Fee();
+		
+		$this->render_fees_for_js( $Settings );
+	}
+
+	public function delete_fee()
+	{
+		$index = Form_Handler::filter_input( 'index' );
+		$Settings = PC_CPQ()->Settings();
+		
+		// handle existing fees
+		$this->refresh_fee_data( $Settings );
+		
+		// delete fee
+		$Settings->delete_Fee( $index );
+		
+		$this->render_fees_for_js( $Settings );
+	}
+	
+	private function render_fees_for_js( $Settings )
+	{
+		$html = PC_CPQ()->view( 'manage/settings/partials/fees', array( 'Settings' => $Settings ) );
+		
+		wp_send_json_success( array(
+			'html' => $html,
+			'feesCount' => $Settings->get_Fees_count(),
+		) );
+	}
+	
+	private function refresh_fee_data( &$Settings )
+	{
+		$live_fees = Form_Handler::get_form_data( 'live_fees' );
+		$Settings->set_raw_fees( $live_fees['raw_fees'] );
+		$Settings->refresh_Fees();
+	}
+	
 	static public function get_model_from_slug( $slug )
 	{
 		$mapping = array(
@@ -511,6 +581,7 @@ class PC_CPQ_Manage_Settings extends MVC_Controller_Registry
 			'barrels' => '\PC_CPQ\Models\Settings\Barrel',
 			'racks' => '\PC_CPQ\Models\Settings\Rack',
 			'operations' => '\PC_CPQ\Models\Settings\Operation',
+			'fees' => '\PC_CPQ\Models\Settings\Fee',
 		);
 		
 		return isset( $mapping[ $slug ] ) ? $mapping[ $slug ] : false;
@@ -518,6 +589,19 @@ class PC_CPQ_Manage_Settings extends MVC_Controller_Registry
 	
 	private function process_settings_data( &$data )
 	{
+		if ( isset( $data['raw_fees'] ) && ! empty( $data['raw_fees'] ) ) {
+			$i = 0;
+			foreach ( $data['raw_fees'] as $raw_fee ) {
+				if ( ! isset( $data['raw_fees'][ $i ]['enabled_by_default'] ) ) {
+					$data['raw_fees'][ $i ]['enabled_by_default'] = 0;
+				}
+				if ( empty( $data['raw_fees'][ $i ]['unit'] ) ) {
+					$data['raw_fees'][ $i ]['unit'] = 'dollars';
+				}
+				$i++;
+			}
+		}
+
 		if ( isset( $data['raw_plating_metals'] ) && ! empty( $data['raw_plating_metals'] ) ) {
 			$i = 0;
 			foreach ( $data['raw_plating_metals'] as $raw_plating_metal ) {

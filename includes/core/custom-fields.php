@@ -67,6 +67,12 @@ class Custom_Fields
 				'menu_title' => 'Quote Options',
 				'parent_slug' => $parent['menu_slug']
 			) );
+			
+			acf_add_options_sub_page( array(
+				'page_title' => 'Fee Options',
+				'menu_title' => 'Fee Options',
+				'parent_slug' => $parent['menu_slug']
+			) );
 
 			acf_add_options_sub_page( array(
 				'page_title' => 'Site Config',

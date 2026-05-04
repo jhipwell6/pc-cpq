@@ -200,6 +200,7 @@ final class PC_CPQ
 		include_once $this->plugin_path() . '/includes/models/settings/Barrel.php';
 		include_once $this->plugin_path() . '/includes/models/settings/Rack.php';
 		include_once $this->plugin_path() . '/includes/models/settings/Operation.php';
+		include_once $this->plugin_path() . '/includes/models/settings/Fee.php';
 		include_once $this->plugin_path() . '/includes/models/Quote.php';
 		include_once $this->plugin_path() . '/includes/models/Lead.php';
 		include_once $this->plugin_path() . '/includes/models/Lead_Quantity.php';

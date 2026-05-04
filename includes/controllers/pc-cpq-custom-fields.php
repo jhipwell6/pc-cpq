@@ -55,6 +55,7 @@ class PC_CPQ_Custom_Fields extends MVC_Controller_Registry
 		add_filter( 'acf/load_field/name=load_template', array( $this, 'load_email_template_choices' ), 10, 1 );
 		add_filter( 'acf/load_field/name=add_recipient', array( $this, 'load_add_recipient_choices' ), 10, 1 );
 		add_filter( 'acf/load_value/name=recipient', array( $this, 'load_recipient' ), 10, 3 );
+		add_filter( 'acf/prepare_field/key=field_quote_fees_fee', array( $this, 'load_fee_choices' ), 10, 3 );
 
 		add_filter( 'acf/load_value/key=field_6192ceff293c8', array( $this, 'set_part_plating_data' ), 10, 3 ); // part_data['plating_line']
 		add_filter( 'acf/load_value/key=field_6192cf0d293c9', array( $this, 'set_part_plating_data' ), 10, 3 ); // part_data['plating_method']
@@ -265,6 +266,23 @@ class PC_CPQ_Custom_Fields extends MVC_Controller_Registry
 
 		return $field;
 	}
+	
+	public function load_fee_choices( $field )
+	{
+		$choices = array();
+		$fees = PC_CPQ()->Settings()->get_Fees();
+		if ( ! empty( $fees ) ) {
+			$default_choices = [ 'Select a fee' ];
+			$raw_choices = array_map( function( $Fee ) {
+				return $Fee->get_name();
+			}, $fees );
+			$choices = array_merge( $default_choices, $raw_choices );
+		}
+
+		$field['choices'] = array_combine( $choices, $choices );
+
+		return $field;
+	}
 
 	public function load_add_recipient_choices( $field )
 	{
@@ -369,6 +387,7 @@ class PC_CPQ_Custom_Fields extends MVC_Controller_Registry
 			'dimensions' => null,
 			'metals' => null,
 			'operations' => null,
+			'pricing_units' => null,
 		);
 
 		$metals = Constants::$metals;
@@ -380,6 +399,8 @@ class PC_CPQ_Custom_Fields extends MVC_Controller_Registry
 		if ( $plating_metals ) {
 			$config['plating_metals'] = Constants::get_col( 'name', $plating_metals );
 		}
+
+		$config['pricing_units'] = \PC_CPQ\Models\Part_Pricing_Inputs::get_price_units();
 
 		return $config;
 	}

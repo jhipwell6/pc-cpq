@@ -18,6 +18,7 @@ class Customer extends Post_Model
 		'post_date' => 'date',
 	);
 	const ALIASES = array(
+		'date_created' => 'date',
 		'contacts' => 'raw_contacts',
 		'shipping' => 'raw_shipping',
 	);
@@ -499,7 +500,7 @@ class Customer extends Post_Model
 		$this->get_Shipping( true );
 	}
 
-	public static function get_customer_by( $prop = 'id', $value )
+	public static function get_customer_by( $prop, $value )
 	{
 		$args = [
 			'post_type' => 'customer',
@@ -510,8 +511,11 @@ class Customer extends Post_Model
 		switch ( $prop ) {
 			case 'name';
 			case 'title';
-				$args['title'] = $value;
-				break;
+				$CustomerByName = ( new self() )->get_by_name( $value );
+				if ( $CustomerByName->get_id() > 0 ) {
+					return $CustomerByName;
+				}
+				return false;
 			
 			case 'email';
 				$args['meta_query'] = [[
@@ -522,7 +526,8 @@ class Customer extends Post_Model
 				break;
 			
 			case 'ID':
-			default: // id
+			case 'id':
+			default:
 				$args['p'] = (int) $value;
 				break;
 		}

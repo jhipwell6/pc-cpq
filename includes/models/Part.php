@@ -721,6 +721,9 @@ class Part extends Repeater_Model
 	public function set_raw_pricing( $value )
 	{
 		$this->raw_pricing = isset( $value[0] ) ? array_first( $value ) : $value;
+		if ( is_array( $this->raw_pricing ) ) {
+			$this->raw_pricing['price_unit'] = self::$Pricing_Input_Class::sanitize_price_unit( $this->raw_pricing['price_unit'] ?? '' );
+		}
 		return $this->raw_pricing;
 	}
 
@@ -748,10 +751,16 @@ class Part extends Repeater_Model
 		$breaks = [];
 
 		foreach ( $this->get_Pricing_Model() as $Pricing ) {
+			$price = $Pricing->get_final_price_per_unit( 'raw' );
+
+			if ( null === $price ) {
+				continue;
+			}
 
 			$breaks[] = [
 				'qty' => $Pricing->get_quantity_min(),
-				'price' => $Pricing->get_final_price_per_unit( 'raw' ),
+				'price' => $price,
+				'unit' => $this->get_Pricing()->get_price_unit(),
 			];
 		}
 
@@ -865,6 +874,7 @@ class Part extends Repeater_Model
 	public function refresh_Pricing()
 	{
 		$this->get_Pricing( true );
+		$this->Pricing_Model = null;
 	}
 
 	private function round( $number )
@@ -902,7 +912,7 @@ class Part extends Repeater_Model
 			'shift' => PC_CPQ()->Settings()->get_default_shift(),
 			'break_in' => PC_CPQ()->Settings()->get_default_break_in(),
 			'metal_adder' => PC_CPQ()->Settings()->get_default_metal_adder(),
-			'price_unit' => '',
+			'price_unit' => 'ea',
 		];
 		$this->get_Pricing( true );
 	}
