@@ -3,7 +3,6 @@
 namespace PC_CPQ\Models;
 
 use \WP_MVC\Models\Abstracts\Repeater_Model;
-use \PC_CPQ\Helpers\Constants;
 use \PC_CPQ\Helpers\Geometry;
 
 if ( ! defined( 'ABSPATH' ) )
@@ -87,7 +86,7 @@ class Part_Process extends Repeater_Model
 	public function get_metal_deposit_rate()
 	{
 		if ( null === $this->metal_deposit_rate ) {
-			$this->metal_deposit_rate = floatval( Constants::get_plating_metal_value( $this->get_metal(), 'deposit_rate' ) );
+			$this->metal_deposit_rate = floatval( PC_CPQ()->Settings()->find_plating_metal_value( $this->get_metal(), 'deposit_rate' ) );
 		}
 		return $this->metal_deposit_rate;
 	}
@@ -95,7 +94,7 @@ class Part_Process extends Repeater_Model
 	public function get_metal_density()
 	{
 		if ( null === $this->metal_density ) {
-			$this->metal_density = floatval( Constants::get_plating_metal_value( $this->get_metal(), 'density' ) );
+			$this->metal_density = floatval( PC_CPQ()->Settings()->find_plating_metal_value( $this->get_metal(), 'density' ) );
 		}
 		return $this->metal_density;
 	}
@@ -103,20 +102,20 @@ class Part_Process extends Repeater_Model
 	public function get_metal_cost()
 	{
 		if ( null === $this->metal_cost ) {
-			$this->metal_cost = floatval( Constants::get_plating_metal_value( $this->get_metal(), 'cost' ) );
+			$this->metal_cost = floatval( PC_CPQ()->Settings()->find_plating_metal_value( $this->get_metal(), 'cost' ) );
 		}
 		return $this->metal_cost;
 	}
 
 	public function is_precious_metal()
 	{
-		return Constants::get_plating_metal_value( $this->get_metal(), 'precious_metal' );
+		return PC_CPQ()->Settings()->find_plating_metal_value( $this->get_metal(), 'precious_metal' );
 	}
 	
 	public function get_min_lot_charge()
 	{
 		if ( null === $this->min_lot_charge ) {
-			$this->min_lot_charge = Constants::get_plating_metal_value( $this->get_metal(), 'min_lot_charge' );
+			$this->min_lot_charge = PC_CPQ()->Settings()->find_plating_metal_value( $this->get_metal(), 'min_lot_charge' );
 		}
 		return $this->min_lot_charge;
 	}
@@ -124,7 +123,7 @@ class Part_Process extends Repeater_Model
 	public function get_unit_type()
 	{
 		if ( null === $this->unit_type ) {
-			$this->unit_type = Constants::get_plating_metal_value( $this->get_metal(), 'unit_type' );
+			$this->unit_type = PC_CPQ()->Settings()->find_plating_metal_value( $this->get_metal(), 'unit_type' );
 		}
 		return $this->unit_type;
 	}
@@ -132,7 +131,7 @@ class Part_Process extends Repeater_Model
 	public function get_unit_visible()
 	{
 		if ( null === $this->unit_visible ) {
-			$this->unit_visible = Constants::get_plating_metal_value( $this->get_metal(), 'unit_visible' );
+			$this->unit_visible = PC_CPQ()->Settings()->find_plating_metal_value( $this->get_metal(), 'unit_visible' );
 		}
 		return $this->unit_visible;
 	}

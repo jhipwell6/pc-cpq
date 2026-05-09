@@ -74,6 +74,24 @@
 							<!-- /.tab-pane p-4 -->
 							<div class="tab-pane p-4" id="part_<?php echo $i; ?>_pricing">
 								<?php $Pricing = $Part->get_Pricing(); ?>
+								<?php
+									$pricing_mode_source = $Lead->has_pricing_mode_override() ? 'Lead Override' : 'Site Default';
+									$pricing_mode = $Lead->get_pricing_mode();
+									$pricing_mode_label = $pricing_mode === 'cost_plus' ? 'Cost Plus' : 'Utilization';
+								?>
+								<div class="alert alert-info">
+									<p class="mb-1"><strong>Effective Pricing Mode:</strong> <?php echo esc_html( $pricing_mode_label ); ?></p>
+									<p class="mb-0"><small>Source: <?php echo esc_html( $pricing_mode_source ); ?></small></p>
+								</div>
+								<?php if ( 'cost_plus' === $pricing_mode ) : ?>
+								<div class="alert alert-light border">
+									<p class="mb-0"><small>Cost Plus uses labor cost, material cost, break-in, and margin to build price. Utilization-based rate adjustments are not applied in this mode.</small></p>
+								</div>
+								<?php else : ?>
+								<div class="alert alert-light border">
+									<p class="mb-0"><small>Utilization uses hourly rate, efficiency, people, shifts, throughput, and margin to dynamically adjust price across quantity breaks.</small></p>
+								</div>
+								<?php endif; ?>
 								<?php echo pc_cpq_get_input_html( 'margin', $Pricing, [ $i, 0 ] ); ?>
 								<?php echo pc_cpq_get_input_html( 'eff', $Pricing, [ $i, 0 ] ); ?>
 								<?php echo pc_cpq_get_input_html( 'people', $Pricing, [ $i, 0 ] ); ?>

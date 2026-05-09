@@ -1,5 +1,13 @@
 import {PC_CPQ_Helpers} from './pc-cpq-helpers.js';
-import {PC_CPQ_TourConfig} from './pc-cpq-tourconfig.js';
+import PC_CPQ_PostLock from './pc-cpq-post-lock.js';
+import TemplateEngine from './templateEngine.js';
+import {
+	getPC_CPQ_CurrentTourPageKey,
+	getPC_CPQ_FullTourConfig,
+	getPC_CPQ_FullTourStartTarget,
+	getPC_CPQ_FullTourTarget,
+	getPC_CPQ_PageTourConfig
+} from './pc-cpq-tourconfig.js';
 import {convert} from 'https://cdn.jsdelivr.net/npm/convert@4';
 
 var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
@@ -12,6 +20,7 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 		bind() {
 			$( document ).on( 'change', 'select', $.proxy( this.onInputChange, this ) );
 			$( document ).on( 'input', 'input, textarea', $.proxy( this.onInputChange, this ) );
+			$( document ).on( 'click', '.js-submit-parent-form', $.proxy( this.submitParentForm, this ) );
 		},
 
 		save( action, postVar, rawData, callback = null ) {
@@ -50,7 +59,11 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 					method: 'POST',
 					body: data
 				} ).then( ( response ) => {
-					return response.json();
+					return response.json().then( ( result ) => ( {
+						...result,
+						_httpStatus: response.status,
+						_httpOk: response.ok,
+					} ) );
 				} ).then( ( result ) => {
 					if ( typeof callback == 'function' ) {
 						callback( result );
@@ -191,6 +204,11 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 			this.showSaveReminder();
 		},
 
+		submitParentForm( e ) {
+			e.preventDefault();
+			$( e.currentTarget ).closest( 'form' ).trigger( 'submit' );
+		},
+
 		showSaveReminder() {
 			$( '.js-save-reminder' ).removeClass( 'd-none' );
 		},
@@ -213,6 +231,22 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 
 		hideSaveError() {
 			$( '.js-save-error' ).addClass( 'd-none' );
+		},
+
+		showActionError( message ) {
+			const errorMessage = message || 'That action could not be completed.';
+			const html = [
+				'<div class="alert alert-danger alert-dismissible js-global-action-error">',
+				'<button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>',
+				'<p class="m-0"><i class="icon fas fa-ban"></i> ',
+				errorMessage,
+				'</p>',
+				'</div>'
+			].join( '' );
+
+			$( '.js-global-action-error' ).remove();
+			$( '.content .container-fluid' ).first().prepend( html );
+			window.scrollTo( { top: 0, behavior: 'smooth' } );
 		},
 
 		showImportSuccess( type ) {
@@ -657,6 +691,8 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 		leadID: $( 'input[name="lead_id"]' ).val(),
 
 		canSendQuote: true,
+		stepRendererPromise: null,
+		filePreviewZoom: 1,
 
 		process: null,
 		quantities: null,
@@ -670,7 +706,6 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 			this.initOperationSortable();
 			this.initPlatingToolInputs();
 			this.customerLookup();
-//			this.renderStepFiles();
 		},
 
 		bind() {
@@ -678,6 +713,7 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 			$( document ).on( 'submit', '.js-send-quote-form', $.proxy( this.sendQuote, this ) );
 			$( document ).on( 'submit', '.js-send-message-form', $.proxy( this.sendMessage, this ) );
 			$( document ).on( 'click', '.js-preview-quote', $.proxy( this.previewQuote, this ) );
+			$( document ).on( 'click', '.js-requote', $.proxy( this.requote, this ) );
 			$( document ).on( 'submit', '.js-edit-lead-form', $.proxy( this.editLead, this ) );
 			$( document ).on( 'click', '.js-delete-lead', $.proxy( this.deleteLead, this ) );
 			$( document ).on( 'click', '.js-add-part', $.proxy( this.addPart, this ) );
@@ -707,6 +743,103 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 
 			$( document ).on( 'click', '.js-save-customer', $.proxy( this.saveCustomer, this ) );
 			$( document ).on( 'change', 'select[name^="raw_parts/"][name$="/metal"]', $.proxy( this.updateProcessMetalData, this ) );
+			$( document ).on( 'shown.bs.collapse', 'tr.collapse[id^="manage-part-details-"]', $.proxy( this.onPartDetailsOpened, this ) );
+			$( document ).on( 'click', '.js-open-file-preview', $.proxy( this.openFilePreview, this ) );
+			$( document ).on( 'click', '.js-file-preview-zoom-in', $.proxy( this.zoomFilePreviewIn, this ) );
+			$( document ).on( 'click', '.js-file-preview-zoom-out', $.proxy( this.zoomFilePreviewOut, this ) );
+			$( document ).on( 'click', '.js-file-preview-zoom-reset', $.proxy( this.resetFilePreviewZoom, this ) );
+		},
+
+		onPartDetailsOpened( e ) {
+			const $scope = $( e.currentTarget );
+			this.renderStepFiles( $scope );
+			this.renderPdfFiles( $scope );
+			this.renderImageFiles( $scope );
+		},
+
+		ensureFilePreviewModal() {
+			let $modal = $( '#part-file-preview-modal' );
+			if ( $modal.length ) {
+				return $modal;
+			}
+
+			$modal = $( TemplateEngine.render( 'part-file-preview-modal-template' ) );
+
+			$( 'body' ).append( $modal );
+			$modal.on( 'hidden.bs.modal', () => {
+				this.filePreviewZoom = 1;
+				$modal.find( '.part-file-preview-modal__body' ).empty();
+				$modal.find( '.part-file-preview-modal__tools' ).addClass( 'd-none' );
+			} );
+
+			return $modal;
+		},
+
+		openFilePreview( e ) {
+			e.preventDefault();
+			const $trigger = $( e.currentTarget );
+			const type = $trigger.data( 'fileType' );
+			const url = $trigger.data( 'fileUrl' );
+			const name = $trigger.data( 'fileName' ) || 'File Preview';
+			if ( ! type || ! url ) {
+				return;
+			}
+
+			const $modal = this.ensureFilePreviewModal();
+			const $body = $modal.find( '.part-file-preview-modal__body' );
+			const $tools = $modal.find( '.part-file-preview-modal__tools' );
+			this.filePreviewZoom = 1;
+			$modal.find( '.modal-title' ).text( name );
+			$body.empty();
+			$tools.toggleClass( 'd-none', type !== 'image' );
+
+			if ( type === 'pdf' ) {
+				$body.append( TemplateEngine.render( 'part-file-preview-pdf-template', { url: url + '#view=FitH', name } ) );
+			} else if ( type === 'image' ) {
+				$body.append( TemplateEngine.render( 'part-file-preview-image-template', { url, name } ) );
+				this.applyFilePreviewZoom();
+			}
+
+			$modal.modal( 'show' );
+		},
+
+		applyFilePreviewZoom() {
+			const $image = $( '#part-file-preview-modal .part-file-preview-modal__image' );
+			if ( ! $image.length ) {
+				return;
+			}
+
+			const image = $image[0];
+			const naturalWidth = image.naturalWidth || $image.data( 'naturalWidth' ) || 0;
+			const naturalHeight = image.naturalHeight || $image.data( 'naturalHeight' ) || 0;
+			if ( naturalWidth && naturalHeight ) {
+				$image.data( 'naturalWidth', naturalWidth );
+				$image.data( 'naturalHeight', naturalHeight );
+				$image.css( {
+					width: `${naturalWidth * this.filePreviewZoom}px`,
+					height: `${naturalHeight * this.filePreviewZoom}px`,
+					maxWidth: 'none',
+					maxHeight: 'none'
+				} );
+			}
+		},
+
+		zoomFilePreviewIn( e ) {
+			e.preventDefault();
+			this.filePreviewZoom = Math.min( 4, this.filePreviewZoom + 0.25 );
+			this.applyFilePreviewZoom();
+		},
+
+		zoomFilePreviewOut( e ) {
+			e.preventDefault();
+			this.filePreviewZoom = Math.max( 0.5, this.filePreviewZoom - 0.25 );
+			this.applyFilePreviewZoom();
+		},
+
+		resetFilePreviewZoom( e ) {
+			e.preventDefault();
+			this.filePreviewZoom = 1;
+			this.applyFilePreviewZoom();
 		},
 
 		onInputChange( e ) {
@@ -742,6 +875,27 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 			}
 		},
 
+		requote( e ) {
+			e.preventDefault();
+
+			if ( ! this.canSendQuote ) {
+				alert( 'Save lead changes before requoting.' );
+				return;
+			}
+
+			if ( confirm( 'Refresh the locked quote snapshot from the current saved lead?' ) == true ) {
+				const data = {
+					action: 'requote',
+					lead_id: this.leadID,
+					requote_nonce: $( '[name="requote_nonce"]' ).first().val()
+				};
+
+				PC_CPQ_Manage.Form.fetch( data, ( ( response ) => {
+					this.refreshLeadView( response );
+				} ) );
+			}
+		},
+
 		sendMessage( e ) {
 			e.preventDefault();
 			const rawData = $( e.target ).serialize();
@@ -771,17 +925,23 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 			PC_CPQ_Manage.Common.forceUnitSystem( 'imperial' );
 			const rawData = $( e.target ).serialize();
 			PC_CPQ_Manage.Form.save( 'edit_lead', 'edit_lead_form', rawData, ( ( response ) => {
-				$( '#edit-lead' ).replaceWith( response.data.html );
-				this.leadID = response.data.leadID;
-				this.setCanSendQuote( true );
-				PC_CPQ_Manage.Common.initWpEditor( 'message' );
-				PC_CPQ_Manage.Common.initWpEditor( 'quote_notes' );
-				PC_CPQ_Manage.Common.initTooltips();
-				PC_CPQ_Manage.Common.initSelect2();
-				PC_CPQ_Manage.Common.convertUnits();
-				this.initProcessSortable();
-				this.initOperationSortable();
+				this.refreshLeadView( response );
 			} ) );
+		},
+
+		refreshLeadView( response ) {
+			this.destroyStepFiles( $( '#edit-lead' ) );
+			$( '#edit-lead' ).replaceWith( response.data.html );
+			this.leadID = response.data.leadID;
+			this.setCanSendQuote( true );
+			PC_CPQ_Manage.Common.initWpEditor( 'message' );
+			PC_CPQ_Manage.Common.initWpEditor( 'quote_notes' );
+			PC_CPQ_Manage.Common.initTooltips();
+			PC_CPQ_Manage.Common.initSelect2();
+			PC_CPQ_Manage.Common.convertUnits();
+			this.initProcessSortable();
+			this.initOperationSortable();
+			PC_CPQ_PostLock.init();
 		},
 
 		deleteLead( e ) {
@@ -793,6 +953,10 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 				};
 
 				PC_CPQ_Manage.Form.fetch( data, ( ( response ) => {
+					if ( ! response?.success ) {
+						PC_CPQ_Manage.Form.showActionError( response?.data?.message || 'That lead could not be deleted.' );
+						return;
+					}
 					$( 'tr[data-type="lead"][data-id="' + ID + '"]' ).remove();
 				} ) );
 			}
@@ -807,6 +971,7 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 			};
 
 			PC_CPQ_Manage.Form.fetch( data, ( ( response ) => {
+				this.destroyStepFiles( $( '#lead-parts' ) );
 				$( '#lead-parts' ).html( response.data.html );
 				$( '[data-target="#part-modal-' + response.data.partsCount + '"]' ).click();
 				PC_CPQ_Manage.Common.initFileUploader();
@@ -827,6 +992,7 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 			};
 
 			PC_CPQ_Manage.Form.fetch( data, ( ( response ) => {
+				this.destroyStepFiles( $( '#lead-parts' ) );
 				$( '#lead-parts' ).html( response.data.html );
 				$( '[data-target="#part-modal-' + response.data.partsCount + '"]' ).click();
 				PC_CPQ_Manage.Common.initFileUploader();
@@ -1588,74 +1754,299 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 			this.updatePartData( data );
 		},
 
-		renderStepFiles: async function () {
-			const occt = await occtimportjs(); // Load WASM once
+		async ensureStepRendererLoaded() {
+			if ( this.stepRendererPromise ) {
+				return this.stepRendererPromise;
+			}
 
-			$( '.step-viewer[data-url]' ).each( async function () {
-				const $canvas = $( this );
-				const canvas = $canvas[0];
-				const url = $canvas.data( 'url' );
-
-				const res = await fetch( url );
-				const buffer = await res.arrayBuffer();
-				const data = new Uint8Array( buffer );
-
-				const shape = occt.ReadStepFile( data, null );
-				if ( ! shape || ! shape.meshes ) {
-					console.error( 'STEP parsing failed or mesh is missing.' );
+			this.stepRendererPromise = new Promise( async ( resolve, reject ) => {
+				if ( typeof THREE === 'undefined' ) {
+					reject( new Error( 'Three.js is not available.' ) );
 					return;
 				}
 
-				const scene = new THREE.Scene();
-				const camera = new THREE.PerspectiveCamera( 45, canvas.width / canvas.height, 0.1, 1000 );
-				const renderer = new THREE.WebGLRenderer( { canvas, antialias: true } );
-				renderer.setSize( canvas.width, canvas.height );
-				renderer.setClearColor( 0x000000, 1 );
-
-				const group = new THREE.Group();
-
-				for ( const meshData of shape.meshes ) {
-					if ( ! meshData?.positions || ! meshData?.indices )
-						continue;
-					const geometry = new THREE.BufferGeometry();
-					geometry.setAttribute(
-							'position',
-							new THREE.BufferAttribute(
-									meshData.positions instanceof Float32Array ? meshData.positions : new Float32Array( meshData.positions ),
-									3
-									)
-							);
-					geometry.setIndex(
-							new THREE.BufferAttribute(
-									meshData.indices instanceof Uint32Array ? meshData.indices : new Uint32Array( meshData.indices ),
-									1
-									)
-							);
-					geometry.computeVertexNormals();
-
-					const material = new THREE.MeshNormalMaterial( { side: THREE.DoubleSide } );
-					const mesh = new THREE.Mesh( geometry, material );
-					group.add( mesh );
+				if ( typeof occtimportjs !== 'function' ) {
+					reject( new Error( 'STEP importer is not available.' ) );
+					return;
 				}
 
-				scene.add( group );
+				try {
+					const wasmUrl = PC_CPQ_ManageConfig.occtWasmUrl || '';
+					const wasmBinary = wasmUrl
+						? await fetch( wasmUrl, { credentials: 'same-origin' } ).then( ( response ) => {
+							if ( ! response.ok ) {
+								throw new Error( 'STEP renderer binary could not be loaded.' );
+							}
+							return response.arrayBuffer();
+						} )
+						: null;
 
-				// Center the model and adjust the camera
-				const box = new THREE.Box3().setFromObject( group );
-				const size = box.getSize( new THREE.Vector3() ).length();
-				const center = box.getCenter( new THREE.Vector3() );
+					resolve(
+						await occtimportjs( {
+							wasmBinary: wasmBinary,
+							locateFile: ( path ) => {
+								if ( path === 'occt-import-js.wasm' && wasmUrl ) {
+									return wasmUrl;
+								}
 
-				group.position.sub( center );
-				camera.position.set( 0, 0, size * 1.5 );
-				camera.lookAt( 0, 0, 0 );
+								return path;
+							}
+						} )
+					);
+				} catch ( error ) {
+					reject( error );
+				}
+			} );
 
-				scene.add( new THREE.AmbientLight( 0xffffff, 1 ) );
+			return this.stepRendererPromise;
+		},
 
-				( function animate() {
-					requestAnimationFrame( animate );
-					group.rotation.y += 0.01; // ✅ rotate the mesh group, not the scene
-					renderer.render( scene, camera );
-				} )();
+		setStepViewerStatus( $canvas, message, isError = false ) {
+			const $status = $canvas.siblings( '.part-model-viewer__status' );
+			if ( ! $status.length ) {
+				return;
+			}
+
+			$status.text( message );
+			$status.toggleClass( 'is-error', isError );
+			$status.toggleClass( 'd-none', ! message );
+		},
+
+		destroyStepFiles( $scope = null ) {
+			const $root = $scope && $scope.length ? $scope : $( document );
+			$root.find( '.step-viewer' ).each( ( i, canvas ) => {
+				if ( canvas.__stepViewerFrame ) {
+					cancelAnimationFrame( canvas.__stepViewerFrame );
+					canvas.__stepViewerFrame = null;
+				}
+			} );
+		},
+
+		renderPdfFiles( $scope = null ) {
+			const $root = $scope && $scope.length ? $scope : $( document );
+			$root.find( '.part-pdf-viewer[data-pdf-url]' ).each( ( i, iframe ) => {
+				const $iframe = $( iframe );
+				if ( $iframe.data( 'pdfViewerInitialized' ) ) {
+					return;
+				}
+
+				const url = $iframe.data( 'pdfUrl' );
+				$iframe.data( 'pdfViewerInitialized', true );
+				this.setStepViewerStatus( $iframe, 'Loading PDF preview...' );
+
+				$iframe.on( 'load', () => {
+					this.setStepViewerStatus( $iframe, '' );
+				} );
+
+				$iframe.on( 'error', () => {
+					this.setStepViewerStatus( $iframe, 'This PDF could not be previewed.', true );
+				} );
+
+				$iframe.attr( 'src', url + '#view=FitH' );
+			} );
+		},
+
+		renderImageFiles( $scope = null ) {
+			const $root = $scope && $scope.length ? $scope : $( document );
+			$root.find( '.part-image-viewer[data-image-url]' ).each( ( i, image ) => {
+				const $image = $( image );
+				if ( $image.data( 'imageViewerInitialized' ) ) {
+					return;
+				}
+
+				const url = $image.data( 'imageUrl' );
+				$image.data( 'imageViewerInitialized', true );
+				this.setStepViewerStatus( $image, 'Loading image preview...' );
+
+				$image.on( 'load', () => {
+					this.setStepViewerStatus( $image, '' );
+				} );
+
+				$image.on( 'error', () => {
+					this.setStepViewerStatus( $image, 'This image could not be previewed.', true );
+				} );
+
+				$image.attr( 'src', url );
+			} );
+		},
+
+		async renderStepFiles( $scope = null ) {
+			const $root = $scope && $scope.length ? $scope : $( document );
+			const $canvases = $root.find( '.step-viewer[data-url]' ).filter( ( i, el ) => ! $( el ).data( 'stepViewerInitialized' ) );
+			if ( ! $canvases.length ) {
+				return;
+			}
+
+			let occt = null;
+			try {
+				occt = await this.ensureStepRendererLoaded();
+			} catch ( error ) {
+				$canvases.each( ( i, canvas ) => {
+					this.setStepViewerStatus( $( canvas ), 'This model could not be loaded right now.', true );
+				} );
+				console.error( error );
+				return;
+			}
+
+			$canvases.each( async ( i, element ) => {
+				const $canvas = $( element );
+				const canvas = $canvas[0];
+				const url = $canvas.data( 'url' );
+
+				$canvas.data( 'stepViewerInitialized', true );
+				this.setStepViewerStatus( $canvas, 'Loading model...' );
+
+				try {
+					const response = await fetch( url, { credentials: 'same-origin' } );
+					if ( ! response.ok ) {
+						throw new Error( 'Model request failed.' );
+					}
+
+					const buffer = await response.arrayBuffer();
+					const result = occt.ReadStepFile( new Uint8Array( buffer ), null );
+					if ( ! result || result.success === false || ! Array.isArray( result.meshes ) || ! result.meshes.length ) {
+						throw new Error( 'No mesh data was returned for this file.' );
+					}
+
+					const renderer = new THREE.WebGLRenderer( { canvas, antialias: true, alpha: true } );
+					renderer.setPixelRatio( window.devicePixelRatio || 1 );
+					renderer.setSize( canvas.width, canvas.height, false );
+					renderer.setClearColor( 0xf8f9fb, 1 );
+
+					const scene = new THREE.Scene();
+					const camera = new THREE.PerspectiveCamera( 45, canvas.width / canvas.height, 0.1, 2000 );
+					const group = new THREE.Group();
+
+					result.meshes.forEach( ( resultMesh ) => {
+						const meshData = resultMesh && resultMesh.mesh ? resultMesh.mesh : resultMesh;
+						const positionArray = meshData?.attributes?.position?.array || meshData?.positions;
+						const normalArray = meshData?.attributes?.normal?.array || null;
+						const indexArray = meshData?.index?.array || meshData?.indices;
+						if ( ! positionArray || ! indexArray ) {
+							return;
+						}
+
+						const geometry = new THREE.BufferGeometry();
+						geometry.setAttribute(
+							'position',
+							new THREE.BufferAttribute(
+								positionArray instanceof Float32Array ? positionArray : new Float32Array( positionArray ),
+								3
+							)
+						);
+
+						if ( normalArray ) {
+							geometry.setAttribute(
+								'normal',
+								new THREE.BufferAttribute(
+									normalArray instanceof Float32Array ? normalArray : new Float32Array( normalArray ),
+									3
+								)
+							);
+						}
+
+						geometry.setIndex(
+							new THREE.BufferAttribute(
+								indexArray instanceof Uint32Array ? indexArray : new Uint32Array( indexArray ),
+								1
+							)
+						);
+						if ( ! normalArray ) {
+							geometry.computeVertexNormals();
+						}
+
+						const material = new THREE.MeshStandardMaterial( {
+							color: Array.isArray( meshData?.color ) ? new THREE.Color( meshData.color[0], meshData.color[1], meshData.color[2] ) : 0x5f6dd9,
+							metalness: 0.12,
+							roughness: 0.45,
+							side: THREE.DoubleSide
+						} );
+
+						group.add( new THREE.Mesh( geometry, material ) );
+					} );
+
+					if ( ! group.children.length ) {
+						throw new Error( 'No renderable mesh data was found.' );
+					}
+
+					scene.add( group );
+					scene.add( new THREE.AmbientLight( 0xffffff, 1.35 ) );
+
+					const keyLight = new THREE.DirectionalLight( 0xffffff, 1.15 );
+					keyLight.position.set( 3, 3, 6 );
+					scene.add( keyLight );
+
+					const fillLight = new THREE.DirectionalLight( 0xdfe6ff, 0.7 );
+					fillLight.position.set( -4, -2, 4 );
+					scene.add( fillLight );
+
+					const box = new THREE.Box3().setFromObject( group );
+					const size = box.getSize( new THREE.Vector3() );
+					const center = box.getCenter( new THREE.Vector3() );
+					const radius = Math.max( size.x, size.y, size.z ) || 1;
+
+					group.position.sub( center );
+					camera.position.set( radius * 0.85, radius * 0.45, radius * 1.7 );
+					camera.lookAt( 0, 0, 0 );
+
+					let isDragging = false;
+					let lastX = 0;
+					let lastY = 0;
+					let zoom = radius * 1.7;
+					const renderScene = () => {
+						renderer.render( scene, camera );
+					};
+
+					canvas.addEventListener( 'pointerdown', ( event ) => {
+						isDragging = true;
+						lastX = event.clientX;
+						lastY = event.clientY;
+						canvas.setPointerCapture( event.pointerId );
+					} );
+
+					canvas.addEventListener( 'pointermove', ( event ) => {
+						if ( ! isDragging ) {
+							return;
+						}
+
+						const deltaX = event.clientX - lastX;
+						const deltaY = event.clientY - lastY;
+						group.rotation.y += deltaX * 0.01;
+						group.rotation.x += deltaY * 0.01;
+						group.rotation.x = Math.max( - Math.PI / 2, Math.min( Math.PI / 2, group.rotation.x ) );
+						lastX = event.clientX;
+						lastY = event.clientY;
+						renderScene();
+					} );
+
+					const stopDragging = ( event ) => {
+						if ( isDragging ) {
+							isDragging = false;
+							if ( event && canvas.hasPointerCapture && canvas.hasPointerCapture( event.pointerId ) ) {
+								canvas.releasePointerCapture( event.pointerId );
+							}
+						}
+					};
+
+					canvas.addEventListener( 'pointerup', stopDragging );
+					canvas.addEventListener( 'pointerleave', stopDragging );
+
+					canvas.addEventListener( 'wheel', ( event ) => {
+						event.preventDefault();
+						zoom += event.deltaY * 0.01;
+						zoom = Math.max( radius * 0.6, Math.min( radius * 3, zoom ) );
+						camera.position.setLength( zoom );
+						camera.lookAt( 0, 0, 0 );
+						renderScene();
+					}, { passive: false } );
+
+					this.setStepViewerStatus( $canvas, 'Drag to rotate. Scroll to zoom.' );
+					renderScene();
+				} catch ( error ) {
+					$canvas.removeData( 'stepViewerInitialized' );
+					this.setStepViewerStatus( $canvas, 'This model could not be rendered.', true );
+					console.error( error );
+				}
 			} );
 		},
 
@@ -1712,6 +2103,7 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 							PC_CPQ_Manage.Common.initTooltips();
 							PC_CPQ_Manage.Common.initSelect2();
 							PC_CPQ_Manage.Common.convertUnits();
+							PC_CPQ_PostLock.init();
 						} );
 			} ) );
 		}
@@ -1738,7 +2130,8 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 			e.preventDefault();
 			const rawData = $( e.target ).serialize();
 			PC_CPQ_Manage.Form.save( 'edit_customer', 'edit_customer_form', rawData, ( ( response ) => {
-				$( '#edit-customer' ).html( response.data.html );
+				$( '#edit-customer' ).replaceWith( response.data.html );
+				PC_CPQ_PostLock.init();
 			} ) );
 		},
 
@@ -1751,6 +2144,10 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 				};
 
 				PC_CPQ_Manage.Form.fetch( data, ( ( response ) => {
+					if ( ! response?.success ) {
+						PC_CPQ_Manage.Form.showActionError( response?.data?.message || 'That customer could not be deleted.' );
+						return;
+					}
 					$( 'tr[data-type="customer"][data-id="' + ID + '"]' ).remove();
 				} ) );
 			}
@@ -1831,14 +2228,20 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 			this.bind();
 			this.initMetalMaterialInputs();
 			this.initSortable();
+			this.toggleIntegrationPanels();
 		},
 
 		bind() {
 			$( document ).on( 'submit', '.js-edit-settings-parts-form', $.proxy( this.editSettingsParts, this ) );
+			$( document ).on( 'submit', '.js-edit-settings-onboarding-form', $.proxy( this.editSettingsOnboarding, this ) );
+			$( document ).on( 'submit', '.js-edit-settings-integrations-form', $.proxy( this.editSettingsIntegrations, this ) );
 			$( document ).on( 'submit', '.js-edit-settings-quotes-form', $.proxy( this.editSettingsQuotes, this ) );
 			$( document ).on( 'submit', '.js-edit-settings-plating-form', $.proxy( this.editSettingsPlating, this ) );
 			$( document ).on( 'submit', '.js-edit-settings-processes-form', $.proxy( this.editSettingsProcesses, this ) );
 			$( document ).on( 'submit', '.js-edit-settings-templates-form', $.proxy( this.editSettingsTemplates, this ) );
+			$( document ).on( 'submit', '.js-add-workspace-user-form', $.proxy( this.addWorkspaceUser, this ) );
+			$( document ).on( 'submit', '.js-update-workspace-user-role-form', $.proxy( this.updateWorkspaceUserRole, this ) );
+			$( document ).on( 'submit', '.js-remove-workspace-user-form', $.proxy( this.removeWorkspaceUser, this ) );
 			$( document ).on( 'submit', '.js-edit-settings-fees-form', $.proxy( this.editSettingsFees, this ) );
 			$( document ).on( 'click', '.js-add-email-template', $.proxy( this.addEmailTemplate, this ) );
 			$( document ).on( 'click', '.js-delete-email-template', $.proxy( this.deleteEmailTemplate, this ) );
@@ -1859,6 +2262,7 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 			$( document ).on( 'submit', '.js-import-settings-file-form', $.proxy( this.importSettings, this ) );
 			$( document ).on( 'click', '.js-export-settings', $.proxy( this.exportSettings, this ) );
 			$( document ).on( 'change', 'select[name^="raw_operations/"][name$="/type"]', $.proxy( this.toggleMetalMaterialInput, this ) );
+			$( document ).on( 'change', '[name="enabled_integrations[]"]', $.proxy( this.toggleIntegrationPanels, this ) );
 		},
 
 		importSettings( e ) {
@@ -1900,6 +2304,38 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 			} ) );
 		},
 
+		editSettingsOnboarding( e ) {
+			e.preventDefault();
+			const rawData = $( e.target ).serialize();
+			PC_CPQ_Manage.Form.save( 'edit_settings_onboarding', 'edit_settings_onboarding_form', rawData, ( ( response ) => {
+				if ( response.success ) {
+					window.location.reload();
+				}
+			} ) );
+		},
+
+		editSettingsIntegrations( e ) {
+			e.preventDefault();
+			const rawData = $( e.target ).serialize();
+			PC_CPQ_Manage.Form.save( 'edit_settings_integrations', 'edit_settings_integrations_form', rawData, ( ( response ) => {
+				$( '#edit-settings-integrations' ).html( response.data.html );
+				this.toggleIntegrationPanels();
+			} ) );
+		},
+
+		toggleIntegrationPanels() {
+			const enabled = $( '[name="enabled_integrations[]"]:checked' ).map( ( i, input ) => {
+				return $( input ).val();
+			} ).get();
+
+			$( '.js-integration-panel' ).each( ( i, panel ) => {
+				const integration = $( panel ).data( 'integration-panel' );
+				$( panel ).toggleClass( 'd-none', enabled.indexOf( integration ) === -1 );
+			} );
+
+			$( '.js-no-integrations-message' ).toggleClass( 'd-none', enabled.length > 0 );
+		},
+
 		editSettingsQuotes( e ) {
 			e.preventDefault();
 			const rawData = $( e.target ).serialize();
@@ -1936,6 +2372,34 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 				this.refreshEmailTemplateWpEditors();
 			} ) );
 		},
+
+		addWorkspaceUser( e ) {
+			e.preventDefault();
+			const rawData = $( e.target ).serialize();
+			PC_CPQ_Manage.Form.save( 'add_workspace_user', 'add_workspace_user_form', rawData, ( ( response ) => {
+				this.handleWorkspaceUsersResponse( response );
+			} ) );
+		},
+
+		updateWorkspaceUserRole( e ) {
+			e.preventDefault();
+			const rawData = $( e.target ).serialize();
+			PC_CPQ_Manage.Form.save( 'update_workspace_user_role', 'update_workspace_user_role_form', rawData, ( ( response ) => {
+				this.handleWorkspaceUsersResponse( response );
+			} ) );
+		},
+
+		removeWorkspaceUser( e ) {
+			e.preventDefault();
+			if ( confirm( 'Remove this user from your workspace?' ) !== true ) {
+				return;
+			}
+
+			const rawData = $( e.target ).serialize();
+			PC_CPQ_Manage.Form.save( 'remove_workspace_user', 'remove_workspace_user_form', rawData, ( ( response ) => {
+				this.handleWorkspaceUsersResponse( response );
+			} ) );
+		},
 		
 		editSettingsFees( e ) {
 			e.preventDefault();
@@ -1943,6 +2407,15 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 			PC_CPQ_Manage.Form.save( 'edit_settings_fees', 'edit_settings_fees_form', rawData, ( ( response ) => {
 				$( '#edit-settings-fees' ).html( response.data.html );
 			} ) );
+		},
+
+		handleWorkspaceUsersResponse( response ) {
+			if ( response.success && response.data && response.data.html ) {
+				$( '#edit-settings-users' ).replaceWith( response.data.html );
+				return;
+			}
+
+			alert( response?.data?.message || 'Something went wrong while updating workspace users.' );
 		},
 
 		addEmailTemplate() {
@@ -2273,38 +2746,326 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 
 	PC_CPQ_Manage.Tour = {
 
-		id: 'pc-cpq-tour',
+		pageTourID: 'pc-cpq-page-tour',
+		fullTourID: 'pc-cpq-full-tour',
+		fullTourStateKey: 'pc-cpq-full-tour-state',
 		instance: null,
+		mode: null,
 
 		init() {
-			this.instance = new Shepherd.Tour( PC_CPQ_TourConfig );
 			this.bind();
-
-			if ( this.shouldStart() ) {
-				this.start();
-			}
+			this.resumeFullTour();
 		},
 
 		bind() {
-			$( document ).on( 'click', '.js-restart-tour', $.proxy( this.start, this ) );
-			this.instance.on( 'cancel', $.proxy( this.dismiss, this ) );
-			this.instance.on( 'complete', $.proxy( this.dismiss, this ) );
+			$( document ).on( 'click', '.js-restart-tour', $.proxy( this.startPageTour, this ) );
+			$( document ).on( 'click', '.js-start-full-tour', $.proxy( this.startFullTour, this ) );
 		},
 
-		start( e ) {
+		startPageTour( e ) {
 			if ( e ) {
 				e.preventDefault();
 			}
-			this.instance.start();
+
+			this.clearFullTourState();
+			this.startInstance( this.createPageTourInstance() );
 		},
 
-		shouldStart() {
-			return $( '.js-restart-tour' ).length && ! localStorage.getItem( this.id );
+		startFullTour( e ) {
+			if ( e ) {
+				e.preventDefault();
+			}
+
+			const target = getPC_CPQ_FullTourStartTarget();
+			if ( ! target ) {
+				return;
+			}
+
+			this.saveFullTourState( {
+				active: true,
+				pageKey: target.pageKey,
+				stepIndex: 0,
+				leadEditUrl: null
+			} );
+
+			if ( getPC_CPQ_CurrentTourPageKey() !== target.pageKey ) {
+				window.location.href = target.url;
+				return;
+			}
+
+			this.startInstance( this.createFullTourInstance( this.getFullTourState() ) );
+		},
+
+		resumeFullTour() {
+			const state = this.getFullTourState();
+			if ( ! state || ! state.active ) {
+				return;
+			}
+
+			if ( getPC_CPQ_CurrentTourPageKey() !== state.pageKey ) {
+				return;
+			}
+
+			const stepIndex = state.stepIndex === 'last' ? this.getLastStepIndexForCurrentPage() : state.stepIndex;
+			this.startInstance( this.createFullTourInstance( state ), stepIndex );
+		},
+
+		startInstance( instance, stepIndex = 0 ) {
+			this.reset( false );
+			this.instance = instance;
+			if ( ! this.instance ) {
+				return;
+			}
+
+			this.instance.start();
+			if ( stepIndex > 0 ) {
+				this.instance.show( stepIndex );
+			}
+		},
+
+		createPageTourInstance() {
+			const config = getPC_CPQ_PageTourConfig();
+			if ( ! config.steps.length ) {
+				return null;
+			}
+
+			const instance = new Shepherd.Tour( config );
+			instance.on( 'cancel', $.proxy( this.dismissPageTour, this ) );
+			instance.on( 'complete', $.proxy( this.dismissPageTour, this ) );
+
+			this.mode = 'page';
+
+			return instance;
+		},
+
+		createFullTourInstance( state ) {
+			const config = getPC_CPQ_FullTourConfig( {
+				pageKey: state.pageKey,
+				leadEditUrl: state.leadEditUrl,
+				setStepIndex: $.proxy( this.setFullTourStepIndex, this ),
+				goPrevPage: $.proxy( this.goToAdjacentFullTourPage, this, 'prev' ),
+				goNextPage: $.proxy( this.goToAdjacentFullTourPage, this, 'next' ),
+				finishTour: $.proxy( this.finishFullTour, this )
+			} );
+			if ( ! config.steps.length ) {
+				return null;
+			}
+
+			const instance = new Shepherd.Tour( config );
+			instance.on( 'cancel', $.proxy( this.cancelFullTour, this ) );
+			instance.on( 'complete', $.proxy( this.finishFullTour, this ) );
+
+			this.mode = 'full';
+
+			return instance;
+		},
+
+		getFullTourState() {
+			const rawState = window.localStorage.getItem( this.fullTourStateKey );
+			if ( ! rawState ) {
+				return null;
+			}
+
+			try {
+				return JSON.parse( rawState );
+			} catch ( error ) {
+				this.clearFullTourState();
+				return null;
+			}
+		},
+
+		saveFullTourState( state ) {
+			window.localStorage.setItem( this.fullTourStateKey, JSON.stringify( state ) );
+		},
+
+		clearFullTourState() {
+			window.localStorage.removeItem( this.fullTourStateKey );
+		},
+
+		setFullTourStepIndex( stepIndex ) {
+			const state = this.getFullTourState();
+			if ( ! state ) {
+				return;
+			}
+
+			state.stepIndex = stepIndex;
+			this.saveFullTourState( state );
+		},
+
+		goToAdjacentFullTourPage( direction ) {
+			const state = this.getFullTourState();
+			if ( ! state ) {
+				return;
+			}
+
+			const target = getPC_CPQ_FullTourTarget( state.pageKey, direction, {
+				leadEditUrl: state.leadEditUrl
+			} );
+			if ( ! target ) {
+				if ( direction === 'next' ) {
+					this.finishFullTour();
+				}
+				return;
+			}
+
+			const leadEditUrl = target.pageKey === 'lead-edit'
+				? target.url
+				: ( state.leadEditUrl || ( state.pageKey === 'lead-edit' ? window.location.href : null ) );
+
+			this.saveFullTourState( {
+				active: true,
+				pageKey: target.pageKey,
+				stepIndex: direction === 'prev' ? 'last' : 0,
+				leadEditUrl: leadEditUrl
+			} );
+
+			window.location.href = target.url;
+		},
+
+		getLastStepIndexForCurrentPage() {
+			const config = getPC_CPQ_FullTourConfig( { pageKey: getPC_CPQ_CurrentTourPageKey() } );
+			return config.steps.length > 0 ? config.steps.length - 1 : 0;
+		},
+
+		finishFullTour() {
+			this.clearFullTourState();
+			this.dismiss();
+		},
+
+		cancelFullTour() {
+			this.clearFullTourState();
+			this.dismiss();
+		},
+
+		dismissPageTour() {
+			this.dismiss();
+		},
+
+		reset( preserveFullTourState = true ) {
+			if ( this.instance ) {
+				const instance = this.instance;
+				this.instance = null;
+				if ( ! preserveFullTourState && this.mode === 'full' ) {
+					this.clearFullTourState();
+				}
+				instance.cancel();
+			}
 		},
 
 		dismiss() {
-			if ( ! localStorage.getItem( this.id ) ) {
-				localStorage.setItem( this.id, 'yes' );
+			this.instance = null;
+			this.mode = null;
+		}
+
+	};
+
+	PC_CPQ_Manage.Reports = {
+
+		init() {
+			this.initCharts();
+		},
+
+		initCharts() {
+			this.renderActivityTrendChart();
+			this.renderStatusTrendChart();
+		},
+
+		renderActivityTrendChart() {
+			const data = this.getChartData( 'reports-activity-trend-data' );
+			const canvas = document.getElementById( 'reports-activity-trend-chart' );
+			if ( ! data || ! canvas || typeof Chart === 'undefined' ) {
+				return;
+			}
+
+			new Chart( canvas, {
+				type: 'line',
+				data: data,
+				options: {
+					responsive: true,
+					maintainAspectRatio: false,
+					interaction: {
+						mode: 'index',
+						intersect: false
+					},
+					plugins: {
+						legend: {
+							position: 'bottom'
+						}
+					},
+					elements: {
+						line: {
+							tension: 0.3,
+							borderWidth: 2
+						},
+						point: {
+							radius: 2,
+							hoverRadius: 4
+						}
+					},
+					scales: {
+						x: {
+							grid: {
+								display: false
+							}
+						},
+						y: {
+							beginAtZero: true,
+							ticks: {
+								precision: 0
+							}
+						}
+					}
+				}
+			} );
+		},
+
+		renderStatusTrendChart() {
+			const data = this.getChartData( 'reports-status-trend-data' );
+			const canvas = document.getElementById( 'reports-status-trend-chart' );
+			if ( ! data || ! canvas || typeof Chart === 'undefined' ) {
+				return;
+			}
+
+			new Chart( canvas, {
+				type: 'bar',
+				data: data,
+				options: {
+					responsive: true,
+					maintainAspectRatio: false,
+					plugins: {
+						legend: {
+							position: 'bottom'
+						}
+					},
+					scales: {
+						x: {
+							stacked: true,
+							grid: {
+								display: false
+							}
+						},
+						y: {
+							stacked: true,
+							beginAtZero: true,
+							ticks: {
+								precision: 0
+							}
+						}
+					}
+				}
+			} );
+		},
+
+		getChartData( id ) {
+			const node = document.getElementById( id );
+			if ( ! node ) {
+				return null;
+			}
+
+			try {
+				return JSON.parse( node.textContent );
+			} catch ( error ) {
+				return null;
 			}
 		}
 
@@ -2328,6 +3089,12 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 		},
 		() => {
 			PC_CPQ_Manage.Tour.init();
+		},
+		() => {
+			PC_CPQ_Manage.Reports.init();
+		},
+		() => {
+			PC_CPQ_PostLock.init();
 		}
 	];
 

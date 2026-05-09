@@ -1,7 +1,83 @@
 <div class="part-summary">
-	<?php /*if ( $Part->get_file() ) : ?>
-	<canvas class="step-viewer" data-url="<?php echo esc_attr( $Part->get_file() ); ?>" width="400" height="300"></canvas>
-	<?php endif; */?>
+	<?php
+		$quote_pricing_snapshot = $Lead->get_quote_pricing_snapshot();
+		$pricing_type = $quote_pricing_snapshot['pricing_type'] ?? $Lead->get_quote_pricing_type();
+		$pricing_rows = array();
+		if ( is_array( $part_snapshot ?? null ) ) {
+			$pricing_rows = $pricing_type === 'commodity'
+				? ( $part_snapshot['commodity_rows'] ?? array() )
+				: ( $part_snapshot['special_rows'] ?? array() );
+		}
+	?>
+	<?php if ( $Part->is_step_file() ) : ?>
+		<div class="part-model-viewer mb-3">
+			<div class="d-flex align-items-center justify-content-between mb-2">
+				<h4 class="h6 text-uppercase mb-0">3D Model</h4>
+				<a href="<?php echo esc_url( $Part->get_file() ); ?>" class="btn btn-xs btn-outline-secondary" target="_blank" rel="noopener noreferrer">Open Original File</a>
+			</div>
+			<div class="part-model-viewer__frame">
+				<canvas
+					class="step-viewer"
+					data-url="<?php echo esc_url( $Part->get_file() ); ?>"
+					data-file-name="<?php echo esc_attr( $Part->get_file_name() ); ?>"
+					width="720"
+					height="420"></canvas>
+				<div class="part-model-viewer__status" aria-live="polite">Loading model...</div>
+			</div>
+		</div>
+	<?php endif; ?>
+	<?php if ( $Part->is_pdf_file() ) : ?>
+		<div class="part-model-viewer mb-3">
+			<div class="d-flex align-items-center justify-content-between mb-2">
+				<h4 class="h6 text-uppercase mb-0">PDF Preview</h4>
+				<div class="btn-group btn-group-sm" role="group">
+					<button
+						type="button"
+						class="btn btn-outline-secondary js-open-file-preview"
+						data-file-type="pdf"
+						data-file-url="<?php echo esc_url( $Part->get_file() ); ?>"
+						data-file-name="<?php echo esc_attr( $Part->get_file_name() ?: 'PDF Preview' ); ?>">
+						Expand
+					</button>
+					<a href="<?php echo esc_url( $Part->get_file() ); ?>" class="btn btn-outline-secondary" target="_blank" rel="noopener noreferrer">Open Original File</a>
+				</div>
+			</div>
+			<div class="part-model-viewer__frame part-model-viewer__frame--pdf">
+				<iframe
+					class="part-pdf-viewer"
+					data-pdf-url="<?php echo esc_url( $Part->get_file() ); ?>"
+					title="<?php echo esc_attr( sprintf( '%s PDF preview', $Part->get_file_name() ?: 'Part' ) ); ?>"
+					loading="lazy"></iframe>
+				<div class="part-model-viewer__status" aria-live="polite">Loading PDF preview...</div>
+			</div>
+		</div>
+	<?php endif; ?>
+	<?php if ( $Part->is_image_file() ) : ?>
+		<div class="part-model-viewer mb-3">
+			<div class="d-flex align-items-center justify-content-between mb-2">
+				<h4 class="h6 text-uppercase mb-0">Image Preview</h4>
+				<div class="btn-group btn-group-sm" role="group">
+					<button
+						type="button"
+						class="btn btn-outline-secondary js-open-file-preview"
+						data-file-type="image"
+						data-file-url="<?php echo esc_url( $Part->get_file() ); ?>"
+						data-file-name="<?php echo esc_attr( $Part->get_file_name() ?: 'Image Preview' ); ?>">
+						Expand
+					</button>
+					<a href="<?php echo esc_url( $Part->get_file() ); ?>" class="btn btn-outline-secondary" target="_blank" rel="noopener noreferrer">Open Original File</a>
+				</div>
+			</div>
+			<div class="part-model-viewer__frame part-model-viewer__frame--image">
+				<img
+					class="part-image-viewer"
+					data-image-url="<?php echo esc_url( $Part->get_file() ); ?>"
+					alt="<?php echo esc_attr( sprintf( '%s image preview', $Part->get_file_name() ?: 'Part' ) ); ?>"
+					loading="lazy" />
+				<div class="part-model-viewer__status" aria-live="polite">Loading image preview...</div>
+			</div>
+		</div>
+	<?php endif; ?>
 	<div class="row">
 		<div class="col-6">
 			<h4 class="h6 text-uppercase">Plating</h4>
@@ -123,15 +199,21 @@
 					</tr>
 					<tr>
 						<td><strong>Material $ / Unit</strong></td>
-						<td><?php echo $Part->get_material_cost( 'view' ); ?></td>
+						<td><?php echo $part_snapshot['material_cost_formatted'] ?? $Part->get_material_cost( 'view' ); ?></td>
 					</tr>
-					<?php if ( $Lead->include_metal_factor() && $Part->has_metal_factors() ) : ?>
+					<?php if ( $Lead->include_metal_factor() && ( ! empty( $part_snapshot['metal_factors'] ) || $Part->has_metal_factors() ) ) : ?>
 					<tr>
 						<td><strong>Metal Factor(s)</strong></td>
 						<td>
-							<?php foreach ( $Part->get_metal_factors() as $metal => $factor ) : ?>
-							<?php echo $metal . ' - ' . round( floatval( $factor ), 4 ); ?><br />
-							<?php endforeach; ?>
+							<?php if ( ! empty( $part_snapshot['metal_factors'] ) ) : ?>
+								<?php foreach ( $part_snapshot['metal_factors'] as $item ) : ?>
+								<?php echo $item['metal'] . ' - ' . $item['factor']; ?><br />
+								<?php endforeach; ?>
+							<?php else : ?>
+								<?php foreach ( $Part->get_metal_factors() as $metal => $factor ) : ?>
+								<?php echo $metal . ' - ' . round( floatval( $factor ), 4 ); ?><br />
+								<?php endforeach; ?>
+							<?php endif; ?>
 						</td>
 					</tr>
 					<?php endif; ?>
@@ -143,7 +225,7 @@
 			</table>
 		</div>
 	</div>
-	<?php if ( is_array( $Part->get_Pricing_Model() ) && ! empty( $Part->get_Pricing_Model() ) ) : ?>
+	<?php if ( ( is_array( $Part->get_Pricing_Model() ) && ! empty( $Part->get_Pricing_Model() ) ) || ! empty( $pricing_rows ) ) : ?>
 	<div class="row">
 		<div class="col-12">
 			<h4 class="h6 text-uppercase mt-3">Special Pricing</h4>

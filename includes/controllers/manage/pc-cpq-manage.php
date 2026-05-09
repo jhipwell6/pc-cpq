@@ -18,12 +18,18 @@ class PC_CPQ_Manage extends MVC_Controller_Registry
 	protected function __construct()
 	{
 		add_action( 'init', array( $this, 'add_rewrite_rules' ) );
+		add_action( 'template_redirect', array( $this, 'maybe_export_reports_csv' ), 1 );
+		add_action( 'save_post_lead', array( $this, 'clear_dashboard_cache' ) );
+		add_action( 'deleted_post', array( $this, 'maybe_clear_dashboard_cache_for_post' ) );
+		add_action( 'trashed_post', array( $this, 'maybe_clear_dashboard_cache_for_post' ) );
+		add_action( 'untrashed_post', array( $this, 'maybe_clear_dashboard_cache_for_post' ) );
 		add_filter( 'query_vars', array( $this, 'add_query_vars' ), 10, 1 );
 		add_filter( 'paginate_links_output', [ $this, 'format_pagination_output' ], 10, 1 );
 		add_shortcode( 'pc_cpq_manage_dashboard', array( $this, 'pc_cpq_view_manage_dashboard' ) );
 		add_shortcode( 'pc_cpq_manage_lead_list', array( $this, 'pc_cpq_view_manage_lead_list' ) );
 		add_shortcode( 'pc_cpq_manage_customer_list', array( $this, 'pc_cpq_view_manage_customer_list' ) );
 		add_shortcode( 'pc_cpq_manage_support', array( $this, 'pc_cpq_view_manage_support' ) );
+		add_shortcode( 'pc_cpq_manage_reports', array( $this, 'pc_cpq_view_manage_reports' ) );
 		add_shortcode( 'pc_cpq_manage_settings', array( $this, 'pc_cpq_view_manage_settings' ) );
 
 //		add_filter( 'posts_where', [ $this, 'custom_acf_search_where' ] );
@@ -56,7 +62,18 @@ class PC_CPQ_Manage extends MVC_Controller_Registry
 
 	public function pc_cpq_view_manage_dashboard()
 	{
-		return PC_CPQ()->view( 'manage/dashboard' );
+		$data = PC_CPQ()->Dashboard()->get_data();
+		return PC_CPQ()->view( 'manage/dashboard', $data );
+	}
+
+	public function clear_dashboard_cache()
+	{
+		PC_CPQ()->Dashboard()->clear_cache();
+	}
+
+	public function maybe_clear_dashboard_cache_for_post( $post_id )
+	{
+		PC_CPQ()->Dashboard()->maybe_clear_cache_for_post( $post_id );
 	}
 
 	public function pc_cpq_view_manage_lead_list()
@@ -65,12 +82,16 @@ class PC_CPQ_Manage extends MVC_Controller_Registry
 			$data = array(
 				'leads' => $this->get_leads(),
 				'max_pages' => $this->get_query()->max_num_pages,
+				'selected_status' => $this->get_selected_lead_status(),
+				'status_options' => \PC_CPQ\Models\Lead::get_status_options(),
 			);
 			return PC_CPQ()->view( 'manage/lead-list', $data );
 		} else {
 			$Lead = PC_CPQ()->lead( get_query_var( 'lead_id' ) );
+			PC_CPQ()->Post_Lock()->redirect_if_locked( $Lead->get_id(), PC_CPQ()->Site()->get_leads_page_url(), 'lead' );
 			$data = array(
 				'Lead' => $Lead,
+				'post_lock' => PC_CPQ()->Post_Lock()->get_editor_lock_data( $Lead->get_id(), 'lead' ),
 			);
 			return PC_CPQ()->view( 'manage/form-edit-lead', $data );
 		}
@@ -88,6 +109,8 @@ class PC_CPQ_Manage extends MVC_Controller_Registry
 			$data = array(
 				'Customer' => PC_CPQ()->customer( get_query_var( 'customer_id' ) ),
 			);
+			PC_CPQ()->Post_Lock()->redirect_if_locked( $data['Customer']->get_id(), PC_CPQ()->Site()->get_customers_page_url(), 'customer' );
+			$data['post_lock'] = PC_CPQ()->Post_Lock()->get_editor_lock_data( $data['Customer']->get_id(), 'customer' );
 			return PC_CPQ()->view( 'manage/form-edit-customer', $data );
 		}
 	}
@@ -97,12 +120,41 @@ class PC_CPQ_Manage extends MVC_Controller_Registry
 		return PC_CPQ()->view( 'manage/support' );
 	}
 
+	public function pc_cpq_view_manage_reports()
+	{
+		$Reports = PC_CPQ()->Reports();
+
+		return PC_CPQ()->view( 'manage/reports', array_merge(
+			$Reports->get_data(),
+			array(
+				'Reports' => $Reports,
+			)
+		) );
+	}
+
+	public function maybe_export_reports_csv()
+	{
+		if ( ! PC_CPQ()->Site()->is_manage_reports() ) {
+			return;
+		}
+
+		if ( ! PC_CPQ()->User()->can_view_reports() ) {
+			return;
+		}
+
+		PC_CPQ()->Reports()->maybe_export_csv();
+	}
+
 	public function pc_cpq_view_manage_settings( $atts )
 	{
 		$data = array(
 			'Settings' => PC_CPQ()->Settings(),
 		);
-		$path = isset( $atts['page'] ) ? '/form-' . $atts['page'] : '';
+		$page = isset( $atts['page'] ) ? $atts['page'] : '';
+		if ( 'users' === $page ) {
+			$data['Workspace_Users'] = PC_CPQ()->Workspace_Users();
+		}
+		$path = $page ? '/form-' . $page : '';
 		return PC_CPQ()->view( 'manage/settings' . $path, $data );
 	}
 
@@ -174,10 +226,20 @@ class PC_CPQ_Manage extends MVC_Controller_Registry
 			'order' => 'DESC',
 			'paged' => $offset,
 		];
+		$meta_query = array();
+
+		$selected_status = $this->get_selected_lead_status();
+		if ( $selected_status ) {
+			$meta_query[] = array(
+				'key' => 'status',
+				'value' => $selected_status,
+				'compare' => '=',
+			);
+		}
 
 		if ( isset( $_GET['q'] ) ) {
 			$search_term = sanitize_text_field( $_GET['q'] );
-			$args['meta_query'] = [
+			$meta_query[] = [
 				'relation' => 'OR',
 				[
 					'key' => 'company',
@@ -217,6 +279,14 @@ class PC_CPQ_Manage extends MVC_Controller_Registry
 			];
 		}
 
+		if ( ! empty( $meta_query ) ) {
+			if ( count( $meta_query ) > 1 ) {
+				$args['meta_query'] = array_merge( array( 'relation' => 'AND' ), $meta_query );
+			} else {
+				$args['meta_query'] = $meta_query;
+			}
+		}
+
 		$leads = new \WP_Query( $args );
 
 		if ( ! $leads->have_posts() ) {
@@ -228,6 +298,16 @@ class PC_CPQ_Manage extends MVC_Controller_Registry
 		return array_map( function ( $lead ) {
 			return PC_CPQ()->lead( $lead->ID );
 		}, $leads->posts );
+	}
+
+	private function get_selected_lead_status()
+	{
+		$status = isset( $_GET['status'] ) ? sanitize_text_field( wp_unslash( $_GET['status'] ) ) : '';
+		if ( ! $status || ! \PC_CPQ\Models\Lead::is_valid_status( $status ) ) {
+			return '';
+		}
+
+		return $status;
 	}
 
 	private function get_customers()

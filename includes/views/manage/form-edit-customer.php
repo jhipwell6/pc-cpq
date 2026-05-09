@@ -1,8 +1,14 @@
-<?php if ( ! PC_CPQ()->is_request( 'ajax' ) ) { ?><div id="edit-customer"><?php } ?>
+<div id="edit-customer" class="js-post-lock-scope">
+	<div
+		class="js-post-lock-root mb-3"
+		data-post-lock="<?php echo esc_attr( wp_json_encode( isset( $post_lock ) ? $post_lock : array() ) ); ?>"
+	>
+		<div class="alert alert-warning js-post-lock-alert d-none mb-0"></div>
+	</div>
 	<form action="" method="post" class="js-edit-customer-form">
 		<div class="row">
 			<div class="col-md-5">
-				<div class="card">
+				<div class="card" id="customer-details-card">
 					<div class="card-header">
 						<h3 class="card-title">Details</h3>
 						<div class="card-tools">
@@ -27,7 +33,7 @@
 					</div>
 					<!-- /.card-body -->
 				</div>
-				<div class="card">
+				<div class="card" id="customer-billing-card">
 					<div class="card-header">
 						<h3 class="card-title">Billing</h3>
 						<div class="card-tools">
@@ -49,7 +55,7 @@
 				</div>
 			</div>
 			<div class="col-md-5">
-				<div class="card">
+				<div class="card" id="customer-contacts-card">
 					<div class="card-header">
 						<h3 class="card-title">Contacts</h3>
 						<div class="card-tools">
@@ -67,7 +73,7 @@
 					<!-- /.card-body -->
 				</div>
 				<!-- /.card -->
-				<div class="card">
+				<div class="card" id="customer-shipping-card">
 					<div class="card-header">
 						<h3 class="card-title">Shipping</h3>
 						<div class="card-tools">
@@ -88,7 +94,7 @@
 			</div>
 			<div class="col-md-2">
 				<?php echo PC_CPQ()->view( 'manage/partials/save-alerts' ); ?>
-				<div class="card">
+				<div class="card" id="customer-save-card">
 					<div class="card-header">
 						<h3 class="card-title">Quote</h3>
 					</div>
@@ -101,4 +107,4 @@
 			</div>
 		</div>
 	</form>
-<?php if ( ! PC_CPQ()->is_request( 'ajax' ) ) { ?></div><?php } ?>
+</div>

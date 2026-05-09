@@ -17,24 +17,30 @@ class PC_CPQ_Manage_Customer extends MVC_Controller_Registry
 	 */
 	protected function __construct()
 	{
-		// handle customers
-		add_action( 'wp_ajax_delete_customer', array( $this, 'delete_customer' ) );
+		$customer_actions = array(
+			'delete_customer' => 'delete_customer',
+			'edit_customer' => 'edit_customer',
+			'add_contact' => 'add_contact',
+			'delete_contact' => 'delete_contact',
+			'add_shipping' => 'add_shipping',
+			'delete_shipping' => 'delete_shipping',
+		);
 
-		// handle edit form
-		add_action( 'wp_ajax_edit_customer', array( $this, 'edit_customer' ) );
-		
-		// handle contacts
-		add_action( 'wp_ajax_add_contact', array( $this, 'add_contact' ) );
-		add_action( 'wp_ajax_delete_contact', array( $this, 'delete_contact' ) );
-		
-		// handle shipping
-		add_action( 'wp_ajax_add_shipping', array( $this, 'add_shipping' ) );
-		add_action( 'wp_ajax_delete_shipping', array( $this, 'delete_shipping' ) );
+		foreach ( $customer_actions as $hook => $method ) {
+			add_action( 'wp_ajax_' . $hook, array( $this, 'authorize_quote_management' ), 0 );
+			add_action( 'wp_ajax_' . $hook, array( $this, $method ) );
+		}
+	}
+
+	public function authorize_quote_management()
+	{
+		PC_CPQ()->User()->assert_can_manage_quotes();
 	}
 	
 	public function delete_customer()
 	{
 		$customer_id = Form_Handler::filter_input( 'customer_id' );
+		$this->assert_customer_editable( $customer_id );
 		$Customer = PC_CPQ()->customer( $customer_id );
 		$Customer->delete();
 		
@@ -51,6 +57,7 @@ class PC_CPQ_Manage_Customer extends MVC_Controller_Registry
 
 		// Check for valid form action and nonce, bail if invalid
 		Form_Handler::pre_validate_form( 'edit_customer_nonce', 'edit_customer', $edit_customer_form );
+		$this->assert_customer_editable( $edit_customer_form['customer_id'] );
 
 		// Save the data
 		$Customer = PC_CPQ()->customer( $edit_customer_form['customer_id'] );
@@ -62,7 +69,10 @@ class PC_CPQ_Manage_Customer extends MVC_Controller_Registry
 	
 	private function render_customer_for_js( $Customer )
 	{
-		$html = PC_CPQ()->view( 'manage/form-edit-customer', array( 'Customer' => $Customer ) );
+		$html = PC_CPQ()->view( 'manage/form-edit-customer', array(
+			'Customer' => $Customer,
+			'post_lock' => PC_CPQ()->Post_Lock()->get_editor_lock_data( $Customer->get_id(), 'customer' ),
+		) );
 		
 		wp_send_json_success( array(
 			'html' => $html,
@@ -72,6 +82,7 @@ class PC_CPQ_Manage_Customer extends MVC_Controller_Registry
 	public function add_contact()
 	{
 		$customer_id = Form_Handler::filter_input( 'customer_id' );
+		$this->assert_customer_editable( $customer_id );
 		$Customer = PC_CPQ()->customer( $customer_id );
 		
 		// handle existing contacts
@@ -86,6 +97,7 @@ class PC_CPQ_Manage_Customer extends MVC_Controller_Registry
 	public function delete_contact()
 	{
 		$customer_id = Form_Handler::filter_input( 'customer_id' );
+		$this->assert_customer_editable( $customer_id );
 		$index = Form_Handler::filter_input( 'index' );
 		$Customer = PC_CPQ()->customer( $customer_id );
 		
@@ -111,6 +123,7 @@ class PC_CPQ_Manage_Customer extends MVC_Controller_Registry
 	public function add_shipping()
 	{
 		$customer_id = Form_Handler::filter_input( 'customer_id' );
+		$this->assert_customer_editable( $customer_id );
 		$Customer = PC_CPQ()->customer( $customer_id );
 		
 		// handle existing shipping
@@ -125,6 +138,7 @@ class PC_CPQ_Manage_Customer extends MVC_Controller_Registry
 	public function delete_shipping()
 	{
 		$customer_id = Form_Handler::filter_input( 'customer_id' );
+		$this->assert_customer_editable( $customer_id );
 		$index = Form_Handler::filter_input( 'index' );
 		$Customer = PC_CPQ()->customer( $customer_id );
 		
@@ -159,6 +173,11 @@ class PC_CPQ_Manage_Customer extends MVC_Controller_Registry
 		$live_shipping = Form_Handler::get_form_data( 'live_shipping' );
 		$Customer->set_raw_shipping( $live_shipping['raw_shipping'] );
 		$Customer->refresh_Shipping();
+	}
+
+	private function assert_customer_editable( $customer_id )
+	{
+		PC_CPQ()->Post_Lock()->assert_editable( $customer_id, 'customer' );
 	}
 }
 

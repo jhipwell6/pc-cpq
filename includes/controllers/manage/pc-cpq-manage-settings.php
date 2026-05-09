@@ -17,51 +17,49 @@ class PC_CPQ_Manage_Settings extends MVC_Controller_Registry
 	 * @return void
 	 */
 	protected function __construct()
-	{		
-		// handle edit settings form
-		add_action( 'wp_ajax_edit_settings_parts', array( $this, 'edit_settings_parts' ) );
-		add_action( 'wp_ajax_edit_settings_quotes', array( $this, 'edit_settings_quotes' ) );
-		add_action( 'wp_ajax_edit_settings_plating', array( $this, 'edit_settings_plating' ) );
-		add_action( 'wp_ajax_edit_settings_processes', array( $this, 'edit_settings_processes' ) );
-		add_action( 'wp_ajax_edit_settings_templates', array( $this, 'edit_settings_templates' ) );
-		add_action( 'wp_ajax_edit_settings_fees', array( $this, 'edit_settings_fees' ) );
-		
-		// handle email templates
-		add_action( 'wp_ajax_add_email_template', array( $this, 'add_email_template' ) );
-		add_action( 'wp_ajax_delete_email_template', array( $this, 'delete_email_template' ) );
-		
-		// handle metals
-		add_action( 'wp_ajax_add_metal', array( $this, 'add_metal' ) );
-		add_action( 'wp_ajax_delete_metal', array( $this, 'delete_metal' ) );
-		
-		// handle plating_metals
-		add_action( 'wp_ajax_add_plating_metal', array( $this, 'add_plating_metal' ) );
-		add_action( 'wp_ajax_delete_plating_metal', array( $this, 'delete_plating_metal' ) );
-		
-		// handle lines
-		add_action( 'wp_ajax_add_line', array( $this, 'add_line' ) );
-		add_action( 'wp_ajax_delete_line', array( $this, 'delete_line' ) );
-		
-		// handle barrels
-		add_action( 'wp_ajax_add_barrel', array( $this, 'add_barrel' ) );
-		add_action( 'wp_ajax_delete_barrel', array( $this, 'delete_barrel' ) );
-		
-		// handle racks
-		add_action( 'wp_ajax_add_rack', array( $this, 'add_rack' ) );
-		add_action( 'wp_ajax_delete_rack', array( $this, 'delete_rack' ) );
-		
-		// handle operations
-		add_action( 'wp_ajax_add_operation', array( $this, 'add_operation' ) );
-		add_action( 'wp_ajax_delete_operation', array( $this, 'delete_operation' ) );
-		
-		// handle fees
-		add_action( 'wp_ajax_add_fee', array( $this, 'add_fee' ) );
-		add_action( 'wp_ajax_delete_fee', array( $this, 'delete_fee' ) );
-		
-		// handle imports & exports
-		add_action( 'wp_ajax_import_settings', array( $this, 'import_settings' ) );
-		add_action( 'wp_ajax_export_settings', array( $this, 'export_settings' ) );
-		
+	{
+		$settings_actions = array(
+			'edit_settings_parts' => 'edit_settings_parts',
+			'edit_settings_onboarding' => 'edit_settings_onboarding',
+			'edit_settings_integrations' => 'edit_settings_integrations',
+			'edit_settings_users' => 'edit_settings_users',
+			'edit_settings_quotes' => 'edit_settings_quotes',
+			'edit_settings_plating' => 'edit_settings_plating',
+			'edit_settings_processes' => 'edit_settings_processes',
+			'edit_settings_templates' => 'edit_settings_templates',
+			'edit_settings_fees' => 'edit_settings_fees',
+			'add_email_template' => 'add_email_template',
+			'delete_email_template' => 'delete_email_template',
+			'add_metal' => 'add_metal',
+			'delete_metal' => 'delete_metal',
+			'add_plating_metal' => 'add_plating_metal',
+			'delete_plating_metal' => 'delete_plating_metal',
+			'add_line' => 'add_line',
+			'delete_line' => 'delete_line',
+			'add_barrel' => 'add_barrel',
+			'delete_barrel' => 'delete_barrel',
+			'add_rack' => 'add_rack',
+			'delete_rack' => 'delete_rack',
+			'add_operation' => 'add_operation',
+			'delete_operation' => 'delete_operation',
+			'add_fee' => 'add_fee',
+			'delete_fee' => 'delete_fee',
+			'add_workspace_user' => 'add_workspace_user',
+			'update_workspace_user_role' => 'update_workspace_user_role',
+			'remove_workspace_user' => 'remove_workspace_user',
+			'import_settings' => 'import_settings',
+			'export_settings' => 'export_settings',
+		);
+
+		foreach ( $settings_actions as $hook => $method ) {
+			add_action( 'wp_ajax_' . $hook, array( $this, 'authorize_settings_request' ), 0 );
+			add_action( 'wp_ajax_' . $hook, array( $this, $method ) );
+		}
+	}
+
+	public function authorize_settings_request()
+	{
+		PC_CPQ()->User()->assert_can_manage_settings();
 	}
 	
 	public function import_settings()
@@ -72,6 +70,7 @@ class PC_CPQ_Manage_Settings extends MVC_Controller_Registry
 		$file = Form_Handler::get_file_data( $file_name );
 		if ( $file ) {
 			CSV_Import_Export_Options::import( $type );
+			$this->clear_dashboard_cache();
 		}
 		
 		wp_send_json_success();
@@ -107,6 +106,54 @@ class PC_CPQ_Manage_Settings extends MVC_Controller_Registry
 		}
 		
 		$this->render_settings_for_js( 'parts', $Settings );
+	}
+
+	public function edit_settings_onboarding()
+	{
+		$edit_settings_onboarding_form = Form_Handler::get_form_data( 'edit_settings_onboarding_form' );
+
+		Form_Handler::validate_form_data( $edit_settings_onboarding_form );
+		Form_Handler::pre_validate_form( 'edit_settings_onboarding_nonce', 'edit_settings_onboarding', $edit_settings_onboarding_form );
+
+		$Settings = PC_CPQ()->Settings();
+		$mode = isset( $edit_settings_onboarding_form['mode'] ) ? $edit_settings_onboarding_form['mode'] : '';
+
+		if ( 'complete' === $mode ) {
+			$Settings->complete_onboarding();
+		} elseif ( 'reopen' === $mode ) {
+			$Settings->reopen_onboarding();
+		}
+
+		$this->render_settings_for_js( 'onboarding', $Settings );
+	}
+
+	public function edit_settings_integrations()
+	{
+		$edit_settings_integrations_form = Form_Handler::get_form_data( 'edit_settings_integrations_form' );
+
+		Form_Handler::validate_form_data( $edit_settings_integrations_form );
+		Form_Handler::pre_validate_form( 'edit_settings_integrations_nonce', 'edit_settings_integrations', $edit_settings_integrations_form );
+
+		$Settings = PC_CPQ()->Settings();
+		$edit_settings_integrations_form['enabled_integrations'] = isset( $edit_settings_integrations_form['enabled_integrations'] ) && is_array( $edit_settings_integrations_form['enabled_integrations'] )
+			? $edit_settings_integrations_form['enabled_integrations']
+			: array();
+
+		foreach ( $edit_settings_integrations_form as $field => $value ) {
+			$Settings->update_prop( $field, $value );
+		}
+
+		$this->render_settings_for_js( 'integrations', $Settings );
+	}
+
+	public function edit_settings_users()
+	{
+		$edit_settings_users_form = Form_Handler::get_form_data( 'edit_settings_users_form' );
+
+		Form_Handler::validate_form_data( $edit_settings_users_form );
+		Form_Handler::pre_validate_form( 'edit_settings_users_nonce', 'edit_settings_users', $edit_settings_users_form );
+
+		$this->render_workspace_users_for_js();
 	}
 	
 	public function edit_settings_quotes()
@@ -213,6 +260,7 @@ class PC_CPQ_Manage_Settings extends MVC_Controller_Registry
 	
 	private function render_settings_for_js( $page, $Settings )
 	{
+		$this->clear_dashboard_cache();
 		$html = PC_CPQ()->view( 'manage/settings/form-' . $page, array( 'Settings' => $Settings ) );
 		
 		wp_send_json_success( array(
@@ -249,6 +297,7 @@ class PC_CPQ_Manage_Settings extends MVC_Controller_Registry
 	
 	private function render_email_templates_for_js( $Settings )
 	{
+		$this->clear_dashboard_cache();
 		$html = PC_CPQ()->view( 'manage/partials/email-templates', array( 'Settings' => $Settings ) );
 		
 		wp_send_json_success( array(
@@ -293,6 +342,7 @@ class PC_CPQ_Manage_Settings extends MVC_Controller_Registry
 	
 	private function render_metals_for_js( $Settings )
 	{
+		$this->clear_dashboard_cache();
 		$html = PC_CPQ()->view( 'manage/settings/partials/metals', array( 'Settings' => $Settings ) );
 		
 		wp_send_json_success( array(
@@ -337,6 +387,7 @@ class PC_CPQ_Manage_Settings extends MVC_Controller_Registry
 	
 	private function render_plating_metals_for_js( $Settings )
 	{
+		$this->clear_dashboard_cache();
 		$html = PC_CPQ()->view( 'manage/settings/partials/plating-metals', array( 'Settings' => $Settings ) );
 		
 		wp_send_json_success( array(
@@ -381,6 +432,7 @@ class PC_CPQ_Manage_Settings extends MVC_Controller_Registry
 	
 	private function render_lines_for_js( $Settings )
 	{
+		$this->clear_dashboard_cache();
 		$html = PC_CPQ()->view( 'manage/settings/partials/lines', array( 'Settings' => $Settings ) );
 		
 		wp_send_json_success( array(
@@ -425,6 +477,7 @@ class PC_CPQ_Manage_Settings extends MVC_Controller_Registry
 	
 	private function render_barrels_for_js( $Settings )
 	{
+		$this->clear_dashboard_cache();
 		$html = PC_CPQ()->view( 'manage/settings/partials/barrels', array( 'Settings' => $Settings ) );
 		
 		wp_send_json_success( array(
@@ -469,6 +522,7 @@ class PC_CPQ_Manage_Settings extends MVC_Controller_Registry
 	
 	private function render_racks_for_js( $Settings )
 	{
+		$this->clear_dashboard_cache();
 		$html = PC_CPQ()->view( 'manage/settings/partials/racks', array( 'Settings' => $Settings ) );
 		
 		wp_send_json_success( array(
@@ -513,6 +567,7 @@ class PC_CPQ_Manage_Settings extends MVC_Controller_Registry
 	
 	private function render_operations_for_js( $Settings )
 	{
+		$this->clear_dashboard_cache();
 		$html = PC_CPQ()->view( 'manage/settings/partials/operations', array( 'Settings' => $Settings ) );
 		
 		wp_send_json_success( array(
@@ -554,9 +609,58 @@ class PC_CPQ_Manage_Settings extends MVC_Controller_Registry
 		
 		$this->render_fees_for_js( $Settings );
 	}
+
+	public function add_workspace_user()
+	{
+		$form = Form_Handler::get_form_data( 'add_workspace_user_form' );
+
+		Form_Handler::validate_form_data( $form );
+		Form_Handler::pre_validate_form( 'add_workspace_user_nonce', 'add_workspace_user', $form );
+
+		try {
+			PC_CPQ()->Workspace_Users()->add_user( $form );
+		} catch ( \Exception $e ) {
+			wp_send_json_error( array( 'message' => $e->getMessage() ), 400 );
+		}
+
+		$this->render_workspace_users_for_js( 'User added.' );
+	}
+
+	public function update_workspace_user_role()
+	{
+		$form = Form_Handler::get_form_data( 'update_workspace_user_role_form' );
+
+		Form_Handler::validate_form_data( $form );
+		Form_Handler::pre_validate_form( 'update_workspace_user_role_nonce', 'update_workspace_user_role', $form );
+
+		try {
+			PC_CPQ()->Workspace_Users()->update_user_role( $form['user_id'] ?? 0, $form['role'] ?? '' );
+		} catch ( \Exception $e ) {
+			wp_send_json_error( array( 'message' => $e->getMessage() ), 400 );
+		}
+
+		$this->render_workspace_users_for_js( 'User role updated.' );
+	}
+
+	public function remove_workspace_user()
+	{
+		$form = Form_Handler::get_form_data( 'remove_workspace_user_form' );
+
+		Form_Handler::validate_form_data( $form );
+		Form_Handler::pre_validate_form( 'remove_workspace_user_nonce', 'remove_workspace_user', $form );
+
+		try {
+			PC_CPQ()->Workspace_Users()->remove_user( $form['user_id'] ?? 0 );
+		} catch ( \Exception $e ) {
+			wp_send_json_error( array( 'message' => $e->getMessage() ), 400 );
+		}
+
+		$this->render_workspace_users_for_js( 'User removed.' );
+	}
 	
 	private function render_fees_for_js( $Settings )
 	{
+		$this->clear_dashboard_cache();
 		$html = PC_CPQ()->view( 'manage/settings/partials/fees', array( 'Settings' => $Settings ) );
 		
 		wp_send_json_success( array(
@@ -617,6 +721,29 @@ class PC_CPQ_Manage_Settings extends MVC_Controller_Registry
 				$i++;
 			}
 		}
+	}
+
+	private function clear_dashboard_cache()
+	{
+		PC_CPQ()->Dashboard()->clear_cache();
+	}
+
+	private function render_workspace_users_for_js( $message = '' )
+	{
+		$html = PC_CPQ()->view(
+			'manage/settings/form-users',
+			array(
+				'Workspace_Users' => PC_CPQ()->Workspace_Users(),
+				'message' => $message,
+			)
+		);
+
+		wp_send_json_success(
+			array(
+				'html' => $html,
+				'message' => $message,
+			)
+		);
 	}
 }
 

@@ -2,8 +2,6 @@
 
 namespace PC_CPQ\Models;
 
-use \PC_CPQ\Helpers\Constants;
-
 if ( ! defined( 'ABSPATH' ) )
 	exit;
 
@@ -78,7 +76,7 @@ class Part_Plating_Tool
 	public function get_actual_count()
 	{
 		if ( null === $this->actual_count ) {
-			$this->actual_count = ( $this->get_size_limit() / $this->get_Part()->get_volume() );
+			$this->actual_count = $this->safe_divide( $this->get_size_limit(), $this->get_Part()->get_volume() );
 		}
 		return $this->actual_count;
 	}
@@ -86,7 +84,7 @@ class Part_Plating_Tool
 	public function get_piece_limit()
 	{
 		if ( null === $this->piece_limit ) {
-			$this->piece_limit = ( $this->get_weight_limit() / $this->get_Part()->get_weight() );
+			$this->piece_limit = $this->safe_divide( $this->get_weight_limit(), $this->get_Part()->get_weight() );
 		}
 		return $this->piece_limit;
 	}
@@ -94,7 +92,7 @@ class Part_Plating_Tool
 	public function get_actual_weight()
 	{
 		if ( null === $this->actual_weight ) {
-			$this->actual_weight = ( $this->get_size_limit() / $this->get_Part()->get_volume() ) * $this->get_Part()->get_weight();
+			$this->actual_weight = $this->safe_divide( $this->get_size_limit(), $this->get_Part()->get_volume() ) * $this->get_Part()->get_weight();
 		}
 		return $this->actual_weight;
 	}
@@ -102,7 +100,7 @@ class Part_Plating_Tool
 	public function get_pieces_per_load() // error??
 	{
 		if ( null === $this->pieces_per_load ) {
-			$this->pieces_per_load = ( $this->get_ft2_load() / $this->get_Part()->get_area() );
+			$this->pieces_per_load = $this->safe_divide( $this->get_ft2_load(), $this->get_Part()->get_area() );
 		}
 		return $this->pieces_per_load;
 	}
@@ -201,23 +199,31 @@ class Part_Plating_Tool
 		switch ( $this->get_Part()->get_tool() ) {
 			case '10 CU.FT. BASKET':
 			case '10 CU.FT. Basket':
-				$actual_piece_count = ( $this->get_size_limit() / $this->get_Part()->get_volume() );
+				$actual_piece_count = $this->safe_divide( $this->get_size_limit(), $this->get_Part()->get_volume(), $this->get_piece_count() );
 				break;
 			case 'CHEM FILM':
 			case 'Chem Film':
-				$actual_piece_count = ( $this->get_size_limit() / ( $this->get_Part()->get_d_y() * $this->get_Part()->get_d_z() ) * 0.35 );
+				$actual_piece_count = $this->safe_divide(
+					$this->get_size_limit(),
+					( $this->get_Part()->get_d_y() * $this->get_Part()->get_d_z() ),
+					$this->get_piece_count()
+				) * 0.35;
 				break;
 			case 'EN TANK SPECIAL':
 			case 'EN Tank Special':
-				$actual_piece_count = ( $this->get_size_limit() / $this->get_Part()->get_volume() );
+				$actual_piece_count = $this->safe_divide( $this->get_size_limit(), $this->get_Part()->get_volume(), $this->get_piece_count() );
 				break;
 			case 'Ideal Rack':
 			case 'Ideal Rack Double Sided':
-				$line = Constants::get_row( $this->get_Part()->get_plating_line(), Constants::$lines );
-				$size_limit = $line['rack_ld_max_in2'];
+				$line = PC_CPQ()->Settings()->find_line( $this->get_Part()->get_plating_line() );
+				$size_limit = isset( $line['rack_ld_max_in2'] ) ? floatval( $line['rack_ld_max_in2'] ) : 0.0;
 				$fheight = $this->get_Part()->get_d_y() < 1.999998 ? ( ( 3 * $this->get_Part()->get_d_y() ) / 8 ) + 0.25 + ( $this->get_Part()->get_d_z() / 4 ) : 1 + ( $this->get_Part()->get_d_z() / 4 );
 				$fwidth = $this->get_Part()->get_d_x() < 1.999998 ? ( ( 3 * $this->get_Part()->get_d_x() ) / 8 ) + 0.25 + ( $this->get_Part()->get_d_z() / 4 ) : 1 + ( $this->get_Part()->get_d_z() / 4 );
-				$actual_piece_count = ( $size_limit / ( ( $this->get_Part()->get_d_y() + $fheight + $fheight ) * ( $this->get_Part()->get_d_x() + $fwidth + $fwidth ) ) );
+				$actual_piece_count = $this->safe_divide(
+					$size_limit,
+					( ( $this->get_Part()->get_d_y() + $fheight + $fheight ) * ( $this->get_Part()->get_d_x() + $fwidth + $fwidth ) ),
+					$this->get_piece_count()
+				);
 				if ( $this->get_Part()->get_tool() == 'Ideal Rack Double Sided' ) {
 					$actual_piece_count = $actual_piece_count * 2;
 				}
@@ -227,6 +233,18 @@ class Part_Plating_Tool
 		}
 
 		return $actual_piece_count;
+	}
+
+	private function safe_divide( $numerator, $denominator, $fallback = 0.0 )
+	{
+		$numerator = floatval( $numerator );
+		$denominator = floatval( $denominator );
+
+		if ( 0.0 === $denominator ) {
+			return floatval( $fallback );
+		}
+
+		return $numerator / $denominator;
 	}
 	
 	public function to_array( $exclude = array() )

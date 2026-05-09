@@ -16,6 +16,7 @@ class Site extends Abstract_Model
 	protected $phone;
 	protected $manage_page;
 	protected $support_page;
+	protected $reports_page;
 	protected $settings_page;
 	protected $leads_page;
 	protected $customers_page;
@@ -24,7 +25,9 @@ class Site extends Abstract_Model
 	protected $page_heading;
 	protected $manage_page_url;
 	protected $manage_subpages;
+	protected $settings_subpages;
 	protected $support_page_url;
+	protected $reports_page_url;
 	protected $settings_page_url;
 	protected $leads_page_url;
 	protected $customers_page_url;
@@ -80,6 +83,23 @@ class Site extends Abstract_Model
 	{
 		return $this->get_prop( 'settings_page' );
 	}
+
+	public function get_reports_page()
+	{
+		$page = $this->get_prop( 'reports_page' );
+		if ( $page ) {
+			return $page;
+		}
+
+		$manage_page = $this->get_manage_page();
+		if ( ! $manage_page ) {
+			return false;
+		}
+
+		$reports_page = get_page_by_path( trailingslashit( get_page_uri( $manage_page ) ) . 'reports' );
+
+		return $reports_page ? $reports_page->ID : false;
+	}
 	
 	public function get_leads_page()
 	{
@@ -120,6 +140,15 @@ class Site extends Abstract_Model
 		}
 		return $this->manage_subpages;
 	}
+
+	public function get_settings_subpages()
+	{
+		if ( null === $this->settings_subpages ) {
+			$offspring = $this->get_settings_page() ? get_pages( array( 'child_of' => $this->get_settings_page() ) ) : array();
+			$this->settings_subpages = ! empty( $offspring ) ? wp_list_pluck( $offspring, 'ID' ) : array();
+		}
+		return $this->settings_subpages;
+	}
 	
 	public function get_manage_page_url()
 	{
@@ -143,6 +172,15 @@ class Site extends Abstract_Model
 			$this->settings_page_url = get_permalink( $this->get_settings_page() );
 		}
 		return null !== $subpage ? trailingslashit( $this->settings_page_url ) . $subpage : $this->settings_page_url;
+	}
+
+	public function get_reports_page_url()
+	{
+		if ( null === $this->reports_page_url ) {
+			$reports_page = $this->get_reports_page();
+			$this->reports_page_url = $reports_page ? get_permalink( $reports_page ) : false;
+		}
+		return $this->reports_page_url;
 	}
 	
 	public function get_leads_page_url()
@@ -169,10 +207,31 @@ class Site extends Abstract_Model
 	{
 		return ! empty( $this->get_manage_pages() ) && is_page( $this->get_manage_pages() );
 	}
+
+	public function is_manage_dashboard()
+	{
+		return is_page( $this->get_manage_page() );
+	}
 	
 	public function is_forgot_password()
 	{
 		return isset( $_GET['forgot_password'] );
+	}
+
+	public function is_reset_password()
+	{
+		return isset( $_GET['reset_password'] );
+	}
+
+	public function get_login_page_url( $args = array() )
+	{
+		$url = $this->get_manage_page_url();
+
+		if ( ! empty( $args ) ) {
+			$url = add_query_arg( $args, $url );
+		}
+
+		return $url;
 	}
 	
 	public function get_manage_pages()
@@ -195,6 +254,30 @@ class Site extends Abstract_Model
 	public function is_manage_customer()
 	{
 		return is_page( $this->get_customers_page() ) && ( get_query_var('customer_id') !== false && get_query_var('customer_id') !== '' );
+	}
+
+	public function is_manage_support()
+	{
+		return $this->get_support_page() && is_page( $this->get_support_page() );
+	}
+
+	public function is_manage_reports()
+	{
+		return $this->get_reports_page() && is_page( $this->get_reports_page() );
+	}
+
+	public function is_manage_settings()
+	{
+		if ( ! $this->get_settings_page() ) {
+			return false;
+		}
+
+		$settings_pages = array_filter( array_unique( array_merge(
+			array( $this->get_settings_page() ),
+			$this->get_settings_subpages()
+		) ) );
+
+		return ! empty( $settings_pages ) && is_page( $settings_pages );
 	}
 	
 	public function is_manage_endpoint()

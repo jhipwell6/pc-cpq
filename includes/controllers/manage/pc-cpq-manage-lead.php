@@ -6,7 +6,6 @@ use \WP_MVC\Controllers\Abstracts\MVC_Controller_Registry;
 use \GFAPI;
 use \PC_CPQ\Core\Nutshell_Service;
 use \PC_CPQ\Helpers\Form_Handler;
-use \PC_CPQ\Helpers\Utilities;
 
 if ( ! defined( 'ABSPATH' ) )
 	exit;
@@ -20,36 +19,36 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 	 */
 	protected function __construct()
 	{
-		// handle quotes
-		add_action( 'wp_ajax_send_quote', array( $this, 'send_quote' ) );
-		add_action( 'wp_ajax_preview_quote', array( $this, 'preview_quote' ) );
+		$lead_actions = array(
+			'send_quote' => 'send_quote',
+			'preview_quote' => 'preview_quote',
+			'requote' => 'requote',
+			'delete_lead' => 'delete_lead',
+			'edit_lead' => 'edit_lead',
+			'send_message' => 'send_message',
+			'add_part' => 'add_part',
+			'clone_part' => 'clone_part',
+			'delete_part' => 'delete_part',
+			'add_part_quantity' => 'add_part_quantity',
+			'delete_part_quantity' => 'delete_part_quantity',
+			'add_part_process' => 'add_part_process',
+			'add_part_operation' => 'add_part_operation',
+			'delete_part_process' => 'delete_part_process',
+			'delete_part_operation' => 'delete_part_operation',
+			'send_to_nutshell' => 'send_to_nutshell',
+			'search_customers' => 'search_customers',
+			'save_customer' => 'save_customer',
+		);
 
-		// handle leads
-		add_action( 'wp_ajax_delete_lead', array( $this, 'delete_lead' ) );
+		foreach ( $lead_actions as $hook => $method ) {
+			add_action( 'wp_ajax_' . $hook, array( $this, 'authorize_quote_management' ), 0 );
+			add_action( 'wp_ajax_' . $hook, array( $this, $method ) );
+		}
+	}
 
-		// handle edit lead form
-		add_action( 'wp_ajax_edit_lead', array( $this, 'edit_lead' ) );
-
-		// handle message lead form
-		add_action( 'wp_ajax_send_message', array( $this, 'send_message' ) );
-
-		// handle parts
-		add_action( 'wp_ajax_add_part', array( $this, 'add_part' ) );
-		add_action( 'wp_ajax_clone_part', array( $this, 'clone_part' ) );
-		add_action( 'wp_ajax_delete_part', array( $this, 'delete_part' ) );
-		add_action( 'wp_ajax_add_part_quantity', array( $this, 'add_part_quantity' ) );
-		add_action( 'wp_ajax_delete_part_quantity', array( $this, 'delete_part_quantity' ) );
-		add_action( 'wp_ajax_add_part_process', array( $this, 'add_part_process' ) );
-		add_action( 'wp_ajax_add_part_operation', array( $this, 'add_part_operation' ) );
-		add_action( 'wp_ajax_delete_part_process', array( $this, 'delete_part_process' ) );
-		add_action( 'wp_ajax_delete_part_operation', array( $this, 'delete_part_operation' ) );
-
-		// handle nutshell
-		add_action( 'wp_ajax_send_to_nutshell', [ $this, 'send_to_nutshell' ] );
-
-		// handle customers lookup
-		add_action( 'wp_ajax_search_customers', [ $this, 'search_customers' ] );
-		add_action( 'wp_ajax_save_customer', [ $this, 'save_customer' ] );
+	public function authorize_quote_management()
+	{
+		PC_CPQ()->User()->assert_can_manage_quotes();
 	}
 
 	public function send_quote()
@@ -57,6 +56,7 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 		// Get form data
 		$send_quote_form = Form_Handler::get_form_data( 'quote' );
 		$lead_id = Form_Handler::filter_input( 'lead_id' );
+		$this->assert_lead_editable( $lead_id );
 
 		// Check for valid form data, bail if invalid
 		Form_Handler::validate_form_data( $send_quote_form );
@@ -82,6 +82,7 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 	{
 		$send_quote_form = Form_Handler::get_form_data( 'quote' );
 		$lead_id = Form_Handler::filter_input( 'lead_id' );
+		$this->assert_lead_editable( $lead_id );
 
 		Form_Handler::validate_form_data( $send_quote_form );
 		Form_Handler::pre_validate_form( 'send_quote_nonce', 'send_quote', $send_quote_form );
@@ -123,6 +124,7 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 		// Get form data
 		$preview_quote_form = Form_Handler::get_form_data( 'preview' );
 		$lead_id = Form_Handler::filter_input( 'lead_id' );
+		$this->assert_lead_editable( $lead_id );
 
 		// Check for valid form data, bail if invalid
 		Form_Handler::validate_form_data( $preview_quote_form );
@@ -140,11 +142,30 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 		) );
 	}
 
+	public function requote()
+	{
+		$requote_form = array(
+			'requote_nonce' => Form_Handler::filter_input( 'requote_nonce' ),
+		);
+		$lead_id = Form_Handler::filter_input( 'lead_id' );
+		$this->assert_lead_editable( $lead_id );
+
+		Form_Handler::validate_form_data( $requote_form );
+		Form_Handler::pre_validate_form( 'requote_nonce', 'requote', $requote_form );
+
+		$Lead = PC_CPQ()->lead( $lead_id );
+		PC_CPQ()->Quote( $Lead )->requote();
+		$Lead->clear_override();
+
+		$this->render_lead_for_js( $Lead );
+	}
+
 	public function send_message()
 	{
 		// Get form data
 		$send_message_form = Form_Handler::get_form_data( 'message' );
 		$lead_id = Form_Handler::filter_input( 'lead_id' );
+		$this->assert_lead_editable( $lead_id );
 
 		// Check for valid form data, bail if invalid
 		Form_Handler::validate_form_data( $send_message_form );
@@ -161,6 +182,7 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 	public function delete_lead()
 	{
 		$lead_id = Form_Handler::filter_input( 'lead_id' );
+		$this->assert_lead_editable( $lead_id );
 		$Lead = PC_CPQ()->lead( $lead_id );
 		$Lead->delete();
 
@@ -177,6 +199,7 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 
 		// Check for valid form action and nonce, bail if invalid
 		Form_Handler::pre_validate_form( 'edit_lead_nonce', 'edit_lead', $edit_lead_form );
+		$this->assert_lead_editable( $edit_lead_form['lead_id'] );
 
 		// Save the data
 		$Lead = PC_CPQ()->lead( $edit_lead_form['lead_id'] );
@@ -205,6 +228,7 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 	public function add_part()
 	{
 		$lead_id = Form_Handler::filter_input( 'lead_id' );
+		$this->assert_lead_editable( $lead_id );
 		$Lead = PC_CPQ()->lead( $lead_id );
 
 		// handle existing parts
@@ -220,6 +244,7 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 	public function clone_part()
 	{
 		$lead_id = Form_Handler::filter_input( 'lead_id' );
+		$this->assert_lead_editable( $lead_id );
 		$clone_part = Form_Handler::filter_input( 'clone_part' );
 		$Lead = PC_CPQ()->lead( $lead_id );
 
@@ -237,6 +262,7 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 	public function delete_part()
 	{
 		$lead_id = Form_Handler::filter_input( 'lead_id' );
+		$this->assert_lead_editable( $lead_id );
 		$index = Form_Handler::filter_input( 'index' );
 		$Lead = PC_CPQ()->lead( $lead_id );
 
@@ -252,6 +278,7 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 	public function add_part_quantity()
 	{
 		$lead_id = Form_Handler::filter_input( 'lead_id' );
+		$this->assert_lead_editable( $lead_id );
 		$part_id = Form_Handler::filter_input( 'part_id' );
 		$Lead = PC_CPQ()->lead( $lead_id );
 		$Parts = $Lead->get_Parts();
@@ -269,6 +296,7 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 	public function delete_part_quantity()
 	{
 		$lead_id = Form_Handler::filter_input( 'lead_id' );
+		$this->assert_lead_editable( $lead_id );
 		$part_id = Form_Handler::filter_input( 'part_id' );
 		$index = Form_Handler::filter_input( 'index' );
 		$Lead = PC_CPQ()->lead( $lead_id );
@@ -287,6 +315,7 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 	public function add_part_process()
 	{
 		$lead_id = Form_Handler::filter_input( 'lead_id' );
+		$this->assert_lead_editable( $lead_id );
 		$part_id = Form_Handler::filter_input( 'part_id' );
 		$Lead = PC_CPQ()->lead( $lead_id );
 		$Parts = $Lead->get_Parts();
@@ -304,6 +333,7 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 	public function delete_part_process()
 	{
 		$lead_id = Form_Handler::filter_input( 'lead_id' );
+		$this->assert_lead_editable( $lead_id );
 		$part_id = Form_Handler::filter_input( 'part_id' );
 		$index = Form_Handler::filter_input( 'index' );
 		$Lead = PC_CPQ()->lead( $lead_id );
@@ -322,6 +352,7 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 	public function add_part_operation()
 	{
 		$lead_id = Form_Handler::filter_input( 'lead_id' );
+		$this->assert_lead_editable( $lead_id );
 		$part_id = Form_Handler::filter_input( 'part_id' );
 		$Lead = PC_CPQ()->lead( $lead_id );
 		$Parts = $Lead->get_Parts();
@@ -339,6 +370,7 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 	public function delete_part_operation()
 	{
 		$lead_id = Form_Handler::filter_input( 'lead_id' );
+		$this->assert_lead_editable( $lead_id );
 		$part_id = Form_Handler::filter_input( 'part_id' );
 		$index = Form_Handler::filter_input( 'index' );
 		$Lead = PC_CPQ()->lead( $lead_id );
@@ -357,6 +389,7 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 	public function send_to_nutshell()
 	{
 		$lead_id = Form_Handler::filter_input( 'lead_id' );
+		$this->assert_lead_editable( $lead_id );
 		$Lead = PC_CPQ()->lead( $lead_id );
 		$nutshell = new Nutshell_Service( $lead_id );
 
@@ -371,7 +404,7 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 		$html = PC_CPQ()->view( 'manage/fields/nutshell-input', [ 'Lead' => $Lead ] );
 
 		wp_send_json_success( array(
-			'html' => Utilities::minify_html( $html ),
+			'html' => minify_html( $html ),
 			'leadID' => $Lead->get_id(),
 			'entryID' => $Lead->get_form_entry_id(),
 		) );
@@ -411,6 +444,7 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 	public function save_customer()
 	{
 		$lead_id = Form_Handler::filter_input( 'lead_id' );
+		$this->assert_lead_editable( $lead_id );
 		$found_customer = Form_Handler::filter_input( 'foundCustomer' );
 		$create_customer = Form_Handler::filter_input( 'createCustomer' );
 		$Lead = PC_CPQ()->lead( $lead_id );
@@ -432,10 +466,13 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 
 	private function render_lead_for_js( $Lead )
 	{
-		$html = PC_CPQ()->view( 'manage/form-edit-lead', array( 'Lead' => $Lead ) );
+		$html = PC_CPQ()->view( 'manage/form-edit-lead', array(
+			'Lead' => $Lead,
+			'post_lock' => PC_CPQ()->Post_Lock()->get_editor_lock_data( $Lead->get_id(), 'lead' ),
+		) );
 
 		wp_send_json_success( array(
-			'html' => Utilities::minify_html( $html ),
+			'html' => minify_html( $html ),
 			'leadID' => $Lead->get_id(),
 		) );
 	}
@@ -445,7 +482,7 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 		$html = PC_CPQ()->view( 'manage/partials/lead-parts', array( 'Lead' => $Lead ) );
 
 		wp_send_json_success( array(
-			'html' => Utilities::minify_html( $html ),
+			'html' => minify_html( $html ),
 			'partsCount' => $Lead->get_Parts_count(),
 		) );
 	}
@@ -455,7 +492,7 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 		$html = PC_CPQ()->view( 'manage/partials/part-tab-quantities', array( 'Part' => $Part, 'i' => $i ) );
 
 		wp_send_json_success( array(
-			'html' => Utilities::minify_html( $html ),
+			'html' => minify_html( $html ),
 			'i' => $i,
 			'quantitiesCount' => $Part->get_Quantities_count(),
 		) );
@@ -466,7 +503,7 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 		$html = PC_CPQ()->view( 'manage/partials/part-tab-processes', array( 'Part' => $Part, 'i' => $i ) );
 
 		wp_send_json_success( array(
-			'html' => Utilities::minify_html( $html ),
+			'html' => minify_html( $html ),
 			'i' => $i,
 			'processesCount' => $Part->get_Processes_count(),
 		) );
@@ -477,7 +514,7 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 		$html = PC_CPQ()->view( 'manage/partials/part-tab-plating', array( 'Part' => $Part, 'i' => $i ) );
 
 		wp_send_json_success( array(
-			'html' => Utilities::minify_html( $html ),
+			'html' => minify_html( $html ),
 			'i' => $i,
 			'operationsCount' => $Part->get_Operations_count(),
 		) );
@@ -557,6 +594,11 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 				'fee' => $fee,
 			);
 		}, array_values( $selected_fees ) );
+	}
+
+	private function assert_lead_editable( $lead_id )
+	{
+		PC_CPQ()->Post_Lock()->assert_editable( $lead_id, 'lead' );
 	}
 }
 

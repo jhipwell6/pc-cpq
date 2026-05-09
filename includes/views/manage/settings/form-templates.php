@@ -18,6 +18,23 @@
 					</div>
 					<!-- /.card-body -->
 				</div>
+				<div class="card" id="templates-pdf-settings-card">
+					<div class="card-header">
+						<h3 class="card-title">PDF Layout Settings</h3>
+						<div class="card-tools">
+							<button type="button" class="btn btn-tool" data-card-widget="collapse" title="Collapse">
+								<i class="fas fa-minus"></i>
+							</button>
+						</div>
+					</div>
+					<div class="card-body">
+						<?php echo pc_cpq_get_input_html( 'quote_form_id', $Settings ); ?>
+						<?php echo pc_cpq_get_input_html( 'quote_pdf_id', $Settings ); ?>
+						<?php echo pc_cpq_get_input_html( 'routing_pdf_id', $Settings ); ?>
+						<?php echo pc_cpq_get_input_html( 'quote_pdf_layout', $Settings ); ?>
+						<?php echo pc_cpq_get_input_html( 'routing_pdf_layout', $Settings ); ?>
+					</div>
+				</div>
 			</div>
 			<div class="col-md-5">
 				<div class="card">

@@ -5,9 +5,6 @@ namespace PC_CPQ\Controllers\Admin;
 use \WP_MVC\Controllers\Abstracts\MVC_Controller_Registry;
 use \PC_CPQ\Core\Nutshell_Service;
 use \PC_CPQ\Helpers\Translate;
-use \PC_CPQ\Helpers\Constants;
-use \PC_CPQ\Helpers\Defaults;
-use \PC_CPQ\Helpers\Quotes;
 use \WP_Query;
 use \GFAPI;
 use \GPDFAPI;
@@ -17,11 +14,6 @@ if ( ! defined( 'ABSPATH' ) )
 
 class PC_CPQ_Lead_Admin extends MVC_Controller_Registry
 {
-	const QUOTE_FORM_ID = 1;
-
-	private static $quote_pdf_id = '61f00df78801d';
-	private static $routing_pdf_id = '624371a9027e0';
-
 	/**
 	 * Initializes variables and sets up WordPress hooks/actions.
 	 * @return void
@@ -61,7 +53,7 @@ class PC_CPQ_Lead_Admin extends MVC_Controller_Registry
 
 	public function render_quote_pdf( $entry, $config )
 	{
-		if ( $config['settings']['id'] != self::$quote_pdf_id ) {
+		if ( ! PC_CPQ()->Pdf_Config()->matches_pdf_config( $config, 'quote' ) ) {
 			return false;
 		}
 
@@ -81,10 +73,13 @@ class PC_CPQ_Lead_Admin extends MVC_Controller_Registry
 				$Lead = PC_CPQ()->lead( get_the_ID() );
 				$data = array(
 					'Lead' => $Lead,
-					'header' => PC_CPQ()->Settings()->get_quote_header(),
-					'footer' => PC_CPQ()->Settings()->get_quote_footer(),
-					'terms' => PC_CPQ()->Settings()->get_quote_terms(),
+					'quote_settings_snapshot' => $Lead->get_quote_settings_snapshot(),
+					'quote_pricing_snapshot' => $Lead->get_quote_pricing_snapshot(),
+					'header' => $Lead->get_quote_settings_snapshot()['quote_content']['quote_header'] ?? PC_CPQ()->Settings()->get_quote_header(),
+					'footer' => $Lead->get_quote_settings_snapshot()['quote_content']['quote_footer'] ?? PC_CPQ()->Settings()->get_quote_footer(),
+					'terms' => $Lead->get_quote_settings_snapshot()['quote_content']['quote_terms'] ?? PC_CPQ()->Settings()->get_quote_terms(),
 					'pricing_type' => $Lead->get_quote_pricing_type(),
+					'layout' => PC_CPQ()->Pdf_Config()->get_layout( 'quote', $Lead->get_quote_settings_snapshot()['pdf'] ?? array() ),
 				);
 
 				echo $this->get_pdf_css();
@@ -96,7 +91,7 @@ class PC_CPQ_Lead_Admin extends MVC_Controller_Registry
 
 	public function render_routing_pdf( $entry, $config )
 	{
-		if ( $config['settings']['id'] != self::$routing_pdf_id ) {
+		if ( ! PC_CPQ()->Pdf_Config()->matches_pdf_config( $config, 'routing' ) ) {
 			return false;
 		}
 
@@ -116,7 +111,10 @@ class PC_CPQ_Lead_Admin extends MVC_Controller_Registry
 				$Lead = PC_CPQ()->lead( get_the_ID() );
 				$data = array(
 					'Lead' => $Lead,
-					'header' => PC_CPQ()->Settings()->get_quote_header(),
+					'quote_settings_snapshot' => $Lead->get_quote_settings_snapshot(),
+					'quote_pricing_snapshot' => $Lead->get_quote_pricing_snapshot(),
+					'header' => $Lead->get_quote_settings_snapshot()['quote_content']['quote_header'] ?? PC_CPQ()->Settings()->get_quote_header(),
+					'layout' => PC_CPQ()->Pdf_Config()->get_layout( 'routing', $Lead->get_quote_settings_snapshot()['pdf'] ?? array() ),
 				);
 				
 				echo $this->get_pdf_css();
@@ -145,11 +143,11 @@ class PC_CPQ_Lead_Admin extends MVC_Controller_Registry
 
 	public function skip_fields_for_pdf( $action, $field, $entry, $form, $config, $products, $blacklisted )
 	{
-		if ( $config['settings']['id'] == self::$quote_pdf_id ) {
+		if ( PC_CPQ()->Pdf_Config()->matches_pdf_config( $config, 'quote' ) ) {
 			return true;
 		}
 
-		if ( $config['settings']['id'] == self::$routing_pdf_id ) {
+		if ( PC_CPQ()->Pdf_Config()->matches_pdf_config( $config, 'routing' ) ) {
 			return true;
 		}
 
@@ -164,31 +162,31 @@ class PC_CPQ_Lead_Admin extends MVC_Controller_Registry
 	{
 		switch ( $field['key'] ) {
 			case 'field_6078d4fd2d956':
-				$value = $this->maybe_load_default( $value, Defaults::$margin );
+				$value = $this->maybe_load_default( $value, PC_CPQ()->Settings()->get_default_margin() );
 				break;
 
 			case 'field_6078d50e2d957':
-				$value = $this->maybe_load_default( $value, Defaults::$eff );
+				$value = $this->maybe_load_default( $value, PC_CPQ()->Settings()->get_default_eff() );
 				break;
 
 			case 'field_6078d5242d958':
-				$value = $this->maybe_load_default( $value, Defaults::$people );
+				$value = $this->maybe_load_default( $value, PC_CPQ()->Settings()->get_default_people() );
 				break;
 
 			case 'field_6078d53a2d959':
-				$value = $this->maybe_load_default( $value, Defaults::$eau );
+				$value = $this->maybe_load_default( $value, PC_CPQ()->Settings()->get_default_eau() );
 				break;
 
 			case 'field_6078d5482d95a':
-				$value = $this->maybe_load_default( $value, Defaults::$shift );
+				$value = $this->maybe_load_default( $value, PC_CPQ()->Settings()->get_default_shift() );
 				break;
 
 			case 'field_61d73807f01de':
-				$value = $this->maybe_load_default( $value, Defaults::$break_in );
+				$value = $this->maybe_load_default( $value, PC_CPQ()->Settings()->get_default_break_in() );
 				break;
 
 			case 'field_627aa4b56941c':
-				$value = $this->maybe_load_default( $value, Defaults::$metal_adder );
+				$value = $this->maybe_load_default( $value, PC_CPQ()->Settings()->get_default_metal_adder() );
 				break;
 		}
 
@@ -219,7 +217,7 @@ class PC_CPQ_Lead_Admin extends MVC_Controller_Registry
 				}
 
 				$avg_thickness = $this->calculate_average_thickness( $process['min_thickness'], $process['max_thickness'] );
-				$deposit_rate = Constants::get_plating_metal_value( $process['metal'], 'deposit_rate' );
+				$deposit_rate = PC_CPQ()->Settings()->find_collection_value( $process['metal'], 'deposit_rate', PC_CPQ()->Settings()->get_raw_plating_metals() );
 				$processes[$i]['field_6192cf73293ce'] = $deposit_rate > 0 ? ceil( $avg_thickness / $deposit_rate ) : 0;
 				$i ++;
 			}

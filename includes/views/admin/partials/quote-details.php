@@ -17,18 +17,25 @@
 				<table>
 					<tbody>
 						<?php
-							$selected_fee_names = wp_list_pluck( (array) $Lead->get_fees(), 'fee' );
-							$selected_fees = array_filter( PC_CPQ()->Settings()->get_Fees(), function( $Fee ) use ( $selected_fee_names ) {
-								return in_array( $Fee->get_name(), $selected_fee_names, true );
-							} );
+							$selected_fee_snapshot = $quote_settings_snapshot['selected_fees'] ?? array();
+							if ( empty( $selected_fee_snapshot ) ) {
+								$selected_fee_names = wp_list_pluck( (array) $Lead->get_fees(), 'fee' );
+								$selected_fees = array_filter( PC_CPQ()->Settings()->get_Fees(), function( $Fee ) use ( $selected_fee_names ) {
+									return in_array( $Fee->get_name(), $selected_fee_names, true );
+								} );
 
-							$formatted_fees = array_map( function( $Fee ) {
-								$amount = $Fee->get_unit() == 'percent'
-									? $Fee->get_amount() . '%'
-									: to_currency( $Fee->get_amount() );
+								$formatted_fees = array_map( function( $Fee ) {
+									$amount = $Fee->get_unit() == 'percent'
+										? $Fee->get_amount() . '%'
+										: to_currency( $Fee->get_amount() );
 
-								return $Fee->get_name() . ' (' . $amount . ')';
-							}, $selected_fees );
+									return $Fee->get_name() . ' (' . $amount . ')';
+								}, $selected_fees );
+							} else {
+								$formatted_fees = array_map( function ( $fee ) {
+									return $fee['name'] . ' (' . $fee['formatted_amount'] . ')';
+								}, $selected_fee_snapshot );
+							}
 
 							$table_data = array(
 								'Quote Number'		=> $Lead->get_quote_number(),

@@ -1,5 +1,14 @@
+<?php if ( isset( $_GET['editor_lock_notice'] ) && isset( $_GET['editor_lock_user'] ) ) : ?>
+<div class="alert alert-warning">
+	<?php
+	$lock_user = sanitize_text_field( wp_unslash( $_GET['editor_lock_user'] ) );
+	$lock_label = sanitize_text_field( wp_unslash( $_GET['editor_lock_label'] ?? 'customer' ) );
+	echo esc_html( sprintf( '%s is already editing that %s. Please try again after they leave or the lock expires.', $lock_user, $lock_label ) );
+	?>
+</div>
+<?php endif; ?>
 <!-- Default box -->
-<div class="card">
+<div class="card" id="customer-list-card">
 	<div class="card-header">
 		<h3 class="card-title">Customers</h3>
 		
@@ -20,7 +29,7 @@
 				View All
             </a>
 			<?php endif; ?>
-			<a href="<?php echo PC_CPQ()->Site()->get_customers_page_url(); ?>new/" class="btn btn-primary btn-sm flex-shrink-0" title="Add Customer">
+			<a href="<?php echo PC_CPQ()->Site()->get_customers_page_url(); ?>new/" class="btn btn-primary btn-sm flex-shrink-0" title="Add Customer" id="customer-list-add-button">
 				<i class="fas fa-plus"></i> Add Customer
             </a>
 		</div>
@@ -49,7 +58,8 @@
 				</tr>
 			</thead>
 			<tbody>
-				<?php foreach ( $customers as $Customer ) : ?>
+				<?php foreach ( $customers as $customer_index => $Customer ) : ?>
+				<?php $lock_status = PC_CPQ()->Post_Lock()->get_post_lock_status( $Customer->get_id(), 'customer' ); ?>
 				<tr data-type="customer" data-id="<?php echo $Customer->get_id(); ?>">
 					<td>
 						# <?php echo $Customer->get_id(); ?>
@@ -59,9 +69,16 @@
 						</small>
 					</td>
 					<td>
-						<a href="<?php echo $Customer->get_manage_url(); ?>">
+						<a href="<?php echo $Customer->get_manage_url(); ?>"<?php echo 0 === $customer_index ? ' class="js-tour-first-customer"' : ''; ?>>
 							<?php echo $Customer->get_name(); ?>
 						</a>
+						<?php if ( ! empty( $lock_status['locked'] ) ) : ?>
+							<br/>
+							<small class="text-warning">
+								<i class="fas fa-lock"></i>
+								Locked by <?php echo esc_html( $lock_status['lockUserName'] ); ?>
+							</small>
+						<?php endif; ?>
 						<br/>
 						<small>
 							<?php echo $Customer->get_customer_code(); ?>
@@ -77,12 +94,15 @@
 						<?php echo $Customer->get_website(); ?>
 					</td>
 					<td class="project-actions text-right">
-						<a class="btn btn-primary btn-sm" href="<?php echo $Customer->get_manage_url(); ?>">
+						<?php if ( ! empty( $lock_status['locked'] ) ) : ?>
+						<span class="badge badge-warning mr-2">Locked</span>
+						<?php endif; ?>
+						<a class="btn btn-primary btn-sm<?php echo 0 === $customer_index ? ' js-tour-first-customer-button' : ''; ?>" href="<?php echo $Customer->get_manage_url(); ?>">
 							<i class="fas fa-folder">
 							</i>
 							View
 						</a>
-						<button type="button" class="btn btn-danger btn-sm js-delete-customer" data-id="<?php echo $Customer->get_id(); ?>">
+						<button type="button" class="btn btn-danger btn-sm js-delete-customer" data-id="<?php echo $Customer->get_id(); ?>"<?php echo ! empty( $lock_status['locked'] ) ? ' disabled title="Locked by ' . esc_attr( $lock_status['lockUserName'] ) . '"' : ''; ?>>
 							<i class="fas fa-trash"></i>
 							Delete
 						</button>

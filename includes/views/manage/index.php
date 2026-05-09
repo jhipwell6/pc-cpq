@@ -9,6 +9,11 @@
 			<!-- Main content -->
 			<section class="content">
 				<div class="container-fluid">
+					<?php if ( isset( $_GET['pc_cpq_notice'] ) && 'access_denied' === sanitize_text_field( wp_unslash( $_GET['pc_cpq_notice'] ) ) ) : ?>
+					<div class="alert alert-warning">
+						You do not have permission to access that page in this workspace.
+					</div>
+					<?php endif; ?>
 					<?php the_content(); ?>
 				</div>
 			</section>
@@ -21,7 +26,9 @@
 	<?php
 	;
 else :
-	if ( $Site->is_forgot_password() ) {
+	if ( $Site->is_reset_password() ) {
+		echo PC_CPQ()->view( 'manage/reset-password', $data );
+	} elseif ( $Site->is_forgot_password() ) {
 		echo PC_CPQ()->view( 'manage/forgot-password', $data );
 	} else {
 		echo PC_CPQ()->view( 'manage/login', $data );

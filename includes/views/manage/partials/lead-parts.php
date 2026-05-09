@@ -1,4 +1,8 @@
 <div id="lead-parts">	
+	<?php
+		$quote_pricing_snapshot = $Lead->get_quote_pricing_snapshot();
+		$quote_parts_snapshot = $Lead->has_quote_snapshot() ? ( $quote_pricing_snapshot['parts'] ?? array() ) : array();
+	?>
 	<table class="table table-striped table-collapsing">
 		<thead>
 			<tr>
@@ -54,6 +58,7 @@
 						$part_data = array(
 							'Part' => $Part,
 							'i' => $i,
+							'part_snapshot' => $quote_parts_snapshot[ $i ] ?? null,
 						);
 						echo PC_CPQ()->view( 'manage/partials/part-summary', array_merge( $data, $part_data ) );
 					?>

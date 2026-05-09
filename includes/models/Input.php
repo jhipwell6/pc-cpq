@@ -8,6 +8,7 @@ if ( ! defined( 'ABSPATH' ) )
 class Input
 {
 	protected $acf_field;
+	protected $field_name;
 	protected $Model;
 	protected $index;
 	protected $id;
@@ -18,6 +19,7 @@ class Input
 
 	public function __construct( $field_name, $Model, $index = null, $alias = null )
 	{
+		$this->set_field_name( $field_name );
 		$this->set_acf_field( $field_name, $alias );
 		$this->set_Model( $Model );
 		$this->set_index( $index );
@@ -37,6 +39,11 @@ class Input
 	public function get_Model()
 	{
 		return $this->Model;
+	}
+
+	public function get_field_name()
+	{
+		return $this->field_name;
 	}
 
 	private function get_index()
@@ -66,7 +73,7 @@ class Input
 	{
 		if ( null === $this->name ) {
 			$prefix = $this->get_name_prefix();
-			$this->name = $prefix . $this->get_acf_field( 'name' );
+			$this->name = $prefix . $this->get_field_name();
 		}
 		return $this->name;
 	}
@@ -82,7 +89,7 @@ class Input
 	public function get_value()
 	{
 		if ( null === $this->value ) {
-			$prop = $this->get_acf_field( 'name' );
+			$prop = $this->get_field_name();
 			$Model = $this->get_Model();
 			$getter = "get_{$prop}";
 			$this->value = $Model->has_prop( $prop ) || is_callable( array( $Model, $getter ) ) ? $Model->{$getter}() : '';
@@ -160,6 +167,12 @@ class Input
 		$this->acf_field = apply_filters( 'acf/prepare_field', $field );
 		$this->acf_field = apply_filters( 'acf/load_field', $this->acf_field );
 		return $this->acf_field;
+	}
+
+	private function set_field_name( $field_name )
+	{
+		$this->field_name = strtolower( $field_name );
+		return $this->field_name;
 	}
 
 	private function set_Model( $Model )

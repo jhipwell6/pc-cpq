@@ -7,8 +7,6 @@ if ( ! defined( 'ABSPATH' ) )
 
 class Nutshell_Service
 {
-	private static $api_user = 'quotes@spc1925.com';
-	private static $api_key = 'dd6c0be6bcf56fc743aeb7e52c4649e539e447ec';
 	private $api;
 	private $post_id;
 	private $entry;
@@ -27,6 +25,11 @@ class Nutshell_Service
 
 	public function maybe_send_lead( $entry, $form = null, $skip_validation = false )
 	{
+		if ( ! $this->is_available() ) {
+			$this->log( 'Skipped Nutshell sync because the integration is not configured for this site.' );
+			return false;
+		}
+
 		$this->entry = is_array( $entry ) ? $entry : array();
 
 		// bail if the lead is not valid
@@ -41,6 +44,10 @@ class Nutshell_Service
 
 	public function fix_lead_ids()
 	{
+		if ( ! $this->is_available() ) {
+			return false;
+		}
+
 		$external_id = get_field( 'external_id', $this->post_id );
 		$nutshell_id = get_field( 'nutshell_id', $this->post_id );
 
@@ -56,6 +63,10 @@ class Nutshell_Service
 
 	public function update_lead_status()
 	{
+		if ( ! $this->is_available() ) {
+			return false;
+		}
+
 		if ( $this->Lead->get_external_id() ) {
 			$lead = $this->api->call( 'getLead', array( 'leadId' => $this->Lead->get_external_id() ) );
 		}
@@ -63,6 +74,10 @@ class Nutshell_Service
 
 	public function get_milestones()
 	{
+		if ( ! $this->is_available() ) {
+			return false;
+		}
+
 		if ( $this->Lead->get_external_id() ) {
 			$milestones = $this->api->call( 'findMilestones' );
 		}
@@ -70,6 +85,10 @@ class Nutshell_Service
 
 	public function get_outcomes()
 	{
+		if ( ! $this->is_available() ) {
+			return false;
+		}
+
 		if ( $this->Lead->get_external_id() ) {
 			$outcomes = $this->api->call( 'findLead_Outcomes' );
 		}
@@ -82,8 +101,15 @@ class Nutshell_Service
 	private function connect()
 	{
 		if ( null === $this->api ) {
-			$this->api = new \NutshellApi( self::$api_user, self::$api_key );
+			$Settings = PC_CPQ()->Settings();
+			if ( ! $Settings->is_nutshell_configured() ) {
+				return false;
+			}
+
+			$this->api = new \NutshellApi( $Settings->get_nutshell_api_user(), $Settings->get_nutshell_api_key() );
 		}
+
+		return $this->api;
 	}
 
 	private function process_lead()
@@ -342,6 +368,11 @@ class Nutshell_Service
 		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
 			error_log( sprintf( '[PC_CPQ Nutshell] lead_id=%d %s', (int) $this->post_id, $message ) );
 		}
+	}
+
+	private function is_available()
+	{
+		return (bool) $this->connect();
 	}
 
 }

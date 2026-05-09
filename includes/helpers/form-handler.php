@@ -97,40 +97,14 @@ class Form_Handler
 
 	static public function parse( string $str, $urlEncoding = true ): array
 	{
-		$result = [];
+		$result = array();
 
-		if ( $str === '' ) {
+		if ( '' === $str ) {
 			return $result;
 		}
 
-		if ( $urlEncoding === true ) {
-			$decoder = function ( $value ) {
-				return rawurldecode( str_replace( '+', ' ', (string) $value ) );
-			};
-		} elseif ( $urlEncoding === PHP_QUERY_RFC3986 ) {
-			$decoder = 'rawurldecode';
-		} elseif ( $urlEncoding === PHP_QUERY_RFC1738 ) {
-			$decoder = 'urldecode';
-		} else {
-			$decoder = function ( $str ) {
-				return $str;
-			};
-		}
+		parse_str( $str, $result );
 
-		foreach ( explode( '&', $str ) as $kvp ) {
-			$parts = explode( '=', $kvp, 2 );
-			$key = $decoder( $parts[0] );
-			$value = isset( $parts[1] ) ? $decoder( $parts[1] ) : null;
-			if ( ! array_key_exists( $key, $result ) ) {
-				$result[$key] = $value;
-			} else {
-				if ( ! is_array( $result[$key] ) ) {
-					$result[$key] = [ $result[$key] ];
-				}
-				$result[$key][] = $value;
-			}
-		}
-
-		return $result;
+		return is_array( $result ) ? $result : array();
 	}
 }

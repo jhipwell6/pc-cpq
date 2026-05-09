@@ -173,3 +173,24 @@ if ( ! function_exists( 'to_currency' ) ) {
 		return $formatter->formatCurrency( $value, 'USD' );
 	}
 }
+
+if ( ! function_exists( 'decamelize' ) ) {
+	function decamelize( $string )
+	{
+		return strtolower( preg_replace( [ '/([a-z\d])([A-Z])/', '/([^_])([A-Z][a-z])/' ], '$1_$2', $string ) );
+	}
+}
+
+if ( ! function_exists( 'minify_html' ) ) {
+	function minify_html( $string )
+	{
+		$search = array(
+			'/\>[^\S ]+/s',
+			'/[^\S ]+\</s',
+			'/(\s)+/s',
+			'/<!--(.|\s)*?-->/'
+		);
+		$replace = array( '>', '<', '\\1' );
+		return preg_replace( $search, $replace, $string );
+	}
+}

@@ -5,7 +5,6 @@ namespace PC_CPQ\Models;
 use \WP_MVC\Models\Abstracts\Repeater_Model;
 use \NumberFormatter;
 use \PC_CPQ\Helpers\Geometry;
-use \PC_CPQ\Helpers\Constants;
 
 if ( ! defined( 'ABSPATH' ) )
 	exit;
@@ -119,6 +118,36 @@ class Part extends Repeater_Model
 			}
 		}
 		return $this->file;
+	}
+
+	public function get_file_extension()
+	{
+		$file = $this->get_file();
+		if ( ! $file ) {
+			return '';
+		}
+
+		$path = wp_parse_url( $file, PHP_URL_PATH );
+		if ( ! $path ) {
+			$path = $file;
+		}
+
+		return strtolower( pathinfo( $path, PATHINFO_EXTENSION ) );
+	}
+
+	public function is_step_file()
+	{
+		return in_array( $this->get_file_extension(), array( 'step', 'stp', 'STEP', 'STP' ), true );
+	}
+
+	public function is_pdf_file()
+	{
+		return 'pdf' === strtolower( $this->get_file_extension() );
+	}
+
+	public function is_image_file()
+	{
+		return in_array( strtolower( $this->get_file_extension() ), array( 'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg' ), true );
 	}
 
 	public function get_area( $context = 'raw' )
@@ -467,7 +496,7 @@ class Part extends Repeater_Model
 	public function get_metal_density( $context = 'raw' )
 	{
 		if ( null === $this->metal_density ) {
-			$this->metal_density = Constants::get_metal_value( $this->get_base_metal(), 'density' );
+			$this->metal_density = PC_CPQ()->Settings()->find_metal_value( $this->get_base_metal(), 'density' );
 		}
 		return $context != 'raw' ? $this->round( $this->metal_density ) . ' #/in&sup3;' : $this->metal_density;
 	}
@@ -475,7 +504,7 @@ class Part extends Repeater_Model
 	public function get_prep_cycle()
 	{
 		if ( null === $this->prep_cycle ) {
-			$this->prep_cycle = Constants::get_metal_value( $this->get_base_metal(), 'prep_cycle' );
+			$this->prep_cycle = PC_CPQ()->Settings()->find_metal_value( $this->get_base_metal(), 'prep_cycle' );
 		}
 		return $this->prep_cycle;
 	}
@@ -545,7 +574,7 @@ class Part extends Repeater_Model
 	public function get_thruput_capacity_computed()
 	{
 		if ( null === $this->thruput_capacity_computed ) {
-			$this->thruput_capacity_computed = Constants::get_line_value( $this->get_plating_line(), 'plate_cells' );
+			$this->thruput_capacity_computed = PC_CPQ()->Settings()->find_line_value( $this->get_plating_line(), 'plate_cells' );
 			if ( $this->thruput_capacity_computed == 0 ) {
 				$this->thruput_capacity_computed = 1;
 			}
@@ -635,8 +664,9 @@ class Part extends Repeater_Model
 	public function get_Plating_Tool()
 	{
 		if ( null === $this->Plating_Tool ) {
-			$tool_type = stripos( $this->get_plating_method(), 'barrel' ) !== false ? Constants::$barrels : Constants::$racks;
-			$tool = Constants::get_row( $this->get_tool(), $tool_type );
+			$tool = stripos( $this->get_plating_method(), 'barrel' ) !== false
+				? PC_CPQ()->Settings()->find_barrel( $this->get_tool() )
+				: PC_CPQ()->Settings()->find_rack( $this->get_tool() );
 			$this->Plating_Tool = new self::$Plating_Tool_Class( $this->get_plating_method(), $tool, $this );
 		}
 		return $this->Plating_Tool;

@@ -4,7 +4,14 @@
 	</div>
 </div>
 <!-- loop -->
-<?php foreach ( $Lead->get_Parts() as $Part ) : ?>
+<?php
+	$quote_pricing_snapshot = $Lead->get_quote_pricing_snapshot();
+	$quote_parts_snapshot = $Lead->has_quote_snapshot() ? ( $quote_pricing_snapshot['parts'] ?? array() ) : array();
+	$pricing_type = $quote_pricing_snapshot['pricing_type'] ?? $Lead->get_quote_pricing_type();
+	$i = 0;
+	foreach ( $Lead->get_Parts() as $Part ) :
+		$part_snapshot = $quote_parts_snapshot[ $i ] ?? null;
+?>
 <div class="pc-cpq-row">
 	<div class="pc-cpq-row">
 		<div class="pc-cpq-col">
@@ -97,15 +104,21 @@
 					</tr>
 					<tr>
 						<td><strong>Material $ / Unit</strong></td>
-						<td><?php echo $Part->get_material_cost('view'); ?></td>
+						<td><?php echo $part_snapshot['material_cost_formatted'] ?? $Part->get_material_cost('view'); ?></td>
 					</tr>
-					<?php if ( $Lead->include_metal_factor() && $Part->has_metal_factors() ) : ?>
+					<?php if ( $Lead->include_metal_factor() && ( ! empty( $part_snapshot['metal_factors'] ) || $Part->has_metal_factors() ) ) : ?>
 					<tr>
 						<td><strong>Metal Factor(s)</strong></td>
 						<td>
-							<?php foreach ( $Part->get_metal_factors() as $metal => $factor ) : ?>
-							<?php echo $metal . ' - ' . round( floatval( $factor ), 4 ); ?><br />
-							<?php endforeach; ?>
+							<?php if ( ! empty( $part_snapshot['metal_factors'] ) ) : ?>
+								<?php foreach ( $part_snapshot['metal_factors'] as $item ) : ?>
+								<?php echo $item['metal'] . ' - ' . $item['factor']; ?><br />
+								<?php endforeach; ?>
+							<?php else : ?>
+								<?php foreach ( $Part->get_metal_factors() as $metal => $factor ) : ?>
+								<?php echo $metal . ' - ' . round( floatval( $factor ), 4 ); ?><br />
+								<?php endforeach; ?>
+							<?php endif; ?>
 						</td>
 					</tr>
 					<?php endif; ?>
@@ -117,7 +130,15 @@
 			</table>
 		</div>
 	</div>
-	<?php if ( is_array( $Part->get_Pricing_Model() ) && ! empty( $Part->get_Pricing_Model() ) ) : ?>
+	<?php
+		$pricing_rows = array();
+		if ( is_array( $part_snapshot ) ) {
+			$pricing_rows = $pricing_type === 'commodity'
+				? ( $part_snapshot['commodity_rows'] ?? array() )
+				: ( $part_snapshot['special_rows'] ?? array() );
+		}
+		if ( ( is_array( $Part->get_Pricing_Model() ) && ! empty( $Part->get_Pricing_Model() ) ) || ! empty( $pricing_rows ) ) :
+	?>
 	<div class="pc-cpq-row">
 		<div class="pc-cpq-col">
 			<h3>Special Pricing</h3>
@@ -136,5 +157,5 @@
 	</div>
 	<?php endif; ?>
 </div>
-<?php endforeach; ?>
+<?php $i++; endforeach; ?>
 <!-- end loop -->

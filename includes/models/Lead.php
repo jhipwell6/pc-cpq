@@ -6,6 +6,7 @@ use \WP_MVC\Models\Abstracts\Post_Model;
 use \NumberFormatter;
 use \GFAPI;
 use \GPDFAPI;
+use PC_CPQ\Core\Pricing\Pricing_Calculator;
 use PC_CPQ\Models\Customer;
 
 if ( ! defined( 'ABSPATH' ) )
@@ -37,6 +38,22 @@ class Lead extends Post_Model
 	protected $email;
 	protected $phone;
 	protected $company;
+
+	public static function get_status_options()
+	{
+		return array(
+			'New' => 'New',
+			'Pending' => 'Pending',
+			'Quoted' => 'Quoted',
+			'No Quote' => 'No Quote',
+			'Canceled' => 'Canceled',
+		);
+	}
+
+	public static function is_valid_status( $status )
+	{
+		return array_key_exists( $status, self::get_status_options() );
+	}
 	protected $certification;
 	protected $include_metal_factor;
 	protected $coating;
@@ -48,9 +65,12 @@ class Lead extends Post_Model
 	protected $notes;
 	protected $quote_notes;
 	protected $quote_pricing_type;
+	protected $pricing_mode;
 	protected $quote_date;
 	protected $follow_up_date;
 	protected $expiration_date;
+	protected $quote_settings_snapshot;
+	protected $quote_pricing_snapshot;
 	protected $raw_specs;
 	protected $external_id;
 	protected $nutshell_id;
@@ -208,6 +228,26 @@ class Lead extends Post_Model
 		return $this->get_prop( 'quote_pricing_type' );
 	}
 
+	public function get_pricing_mode()
+	{
+		if ( null === $this->pricing_mode ) {
+			$value = $this->get_meta( 'pricing_mode' );
+			if ( null === $value || '' === $value || false === $value ) {
+				$this->pricing_mode = PC_CPQ()->Settings()->get_default_pricing_mode();
+			} else {
+				$this->pricing_mode = $value;
+			}
+		}
+
+		return Pricing_Calculator::sanitize_mode( (string) $this->pricing_mode );
+	}
+
+	public function has_pricing_mode_override()
+	{
+		$value = $this->get_meta( 'pricing_mode' );
+		return ! ( null === $value || '' === $value || false === $value );
+	}
+
 	public function get_quote_date( $format = 'm/d/Y h:s a' )
 	{
 		if ( null === $this->quote_date ) {
@@ -230,6 +270,22 @@ class Lead extends Post_Model
 			$this->expiration_date = $this->get_meta( 'expiration_date' );
 		}
 		return $this->expiration_date ? $this->to_datetime( $this->expiration_date, $format ) : '';
+	}
+
+	public function get_quote_settings_snapshot()
+	{
+		if ( null === $this->quote_settings_snapshot ) {
+			$this->quote_settings_snapshot = get_post_meta( $this->get_id(), 'quote_settings_snapshot', true );
+		}
+		return $this->quote_settings_snapshot;
+	}
+
+	public function get_quote_pricing_snapshot()
+	{
+		if ( null === $this->quote_pricing_snapshot ) {
+			$this->quote_pricing_snapshot = get_post_meta( $this->get_id(), 'quote_pricing_snapshot', true );
+		}
+		return $this->quote_pricing_snapshot;
 	}
 
 	public function get_raw_customer()
@@ -442,6 +498,15 @@ class Lead extends Post_Model
 		return $this->set_prop( 'quote_pricing_type', $value );
 	}
 
+	public function set_pricing_mode( $value )
+	{
+		if ( null === $value || '' === $value || false === $value ) {
+			return $this->set_prop( 'pricing_mode', '' );
+		}
+
+		return $this->set_prop( 'pricing_mode', Pricing_Calculator::sanitize_mode( (string) $value ) );
+	}
+
 	public function set_quote_date( $value )
 	{
 		return $this->set_prop( 'quote_date', $value );
@@ -455,6 +520,16 @@ class Lead extends Post_Model
 	public function set_expiration_date( $value )
 	{
 		return $this->set_prop( 'expiration_date', $value );
+	}
+
+	public function set_quote_settings_snapshot( $value )
+	{
+		return $this->set_prop( 'quote_settings_snapshot', $value );
+	}
+
+	public function set_quote_pricing_snapshot( $value )
+	{
+		return $this->set_prop( 'quote_pricing_snapshot', $value );
 	}
 
 	public function set_raw_customer( $value )
@@ -556,6 +631,25 @@ class Lead extends Post_Model
 	public function save_sent_meta( $value )
 	{
 		return update_post_meta( $this->get_id(), 'sent', $value );
+	}
+
+	public function save_quote_settings_snapshot_meta( $value )
+	{
+		return update_post_meta( $this->get_id(), 'quote_settings_snapshot', $value );
+	}
+
+	public function save_quote_pricing_snapshot_meta( $value )
+	{
+		return update_post_meta( $this->get_id(), 'quote_pricing_snapshot', $value );
+	}
+
+	public function persist_quote_snapshots( $settings_snapshot, $pricing_snapshot )
+	{
+		$this->set_quote_settings_snapshot( $settings_snapshot );
+		$this->set_quote_pricing_snapshot( $pricing_snapshot );
+
+		$this->save_quote_settings_snapshot_meta( $settings_snapshot );
+		$this->save_quote_pricing_snapshot_meta( $pricing_snapshot );
 	}
 
 	public function save_raw_customer_meta( $value )
@@ -669,7 +763,7 @@ class Lead extends Post_Model
 	public function get_quote_pdf()
 	{
 		if ( null === $this->quote_pdf ) {
-			$this->quote_pdf = $this->get_pdf_by_name( 'Quote PDF' );
+			$this->quote_pdf = PC_CPQ()->Pdf_Config()->get_pdf_shortcode( 'quote', $this );
 		}
 		return $this->quote_pdf;
 	}
@@ -677,7 +771,7 @@ class Lead extends Post_Model
 	public function get_routing_pdf()
 	{
 		if ( null === $this->routing_pdf ) {
-			$this->routing_pdf = $this->get_pdf_by_name( 'Routing PDF' );
+			$this->routing_pdf = PC_CPQ()->Pdf_Config()->get_pdf_shortcode( 'routing', $this );
 		}
 		return $this->routing_pdf;
 	}
@@ -756,21 +850,14 @@ class Lead extends Post_Model
 		return array_filter( array_column( (array) $array, $key ) );
 	}
 
-	private function get_pdf_by_name( $name )
-	{
-		if ( $this->has_pdfs() ) {
-			$pdf_array = wp_list_filter( $this->get_pdfs(), [ 'name' => $name ] );
-			if ( ! empty( $pdf_array ) ) {
-				$pdf = array_first( $pdf_array );
-				return do_shortcode( '[gravitypdf id="' . $pdf['id'] . '" entry="' . $this->get_form_entry_id() . '" type="view" raw="1"]' );
-			}
-		}
-		return '';
-	}
-
 	public function is_sent()
 	{
 		return $this->get_sent();
+	}
+
+	public function has_quote_snapshot()
+	{
+		return ! empty( $this->get_quote_settings_snapshot() ) && ! empty( $this->get_quote_pricing_snapshot() );
 	}
 
 	public function get_Parts_count()

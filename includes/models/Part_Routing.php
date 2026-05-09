@@ -69,14 +69,6 @@ class Part_Routing extends Repeater_Model
 
 	private function get_site_Operation()
 	{
-		return array_first( array_filter( PC_CPQ()->Settings()->get_Operations(), function( $Operation ) {
-			if ( is_array( $Operation->get_metal() ) ) {
-				return array_first( array_filter( $Operation->get_metal(), function( $metal ) use ( $Operation ) {
-					return $Operation->get_type() == $this->get_type() && $metal == $this->get_metal();
-				} ) );
-			} else {
-				return $Operation->get_type() == $this->get_type() && $Operation->get_metal() == $this->get_metal();
-			}
-		} ) );
+		return PC_CPQ()->Settings()->find_operation( $this->get_type(), $this->get_metal() );
 	}
 }

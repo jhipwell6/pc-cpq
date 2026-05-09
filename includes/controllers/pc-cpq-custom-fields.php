@@ -3,7 +3,6 @@
 namespace PC_CPQ\Controllers;
 
 use \WP_MVC\Controllers\Abstracts\MVC_Controller_Registry;
-use \PC_CPQ\Helpers\Constants;
 
 if ( ! defined( 'ABSPATH' ) )
 	exit;
@@ -32,6 +31,9 @@ class PC_CPQ_Custom_Fields extends MVC_Controller_Registry
 		add_filter( 'acf/prepare_field/key=field_610ab9b002fe7', array( $this, 'set_readonly_fields' ), 10, 1 ); // follow_up_date
 		add_filter( 'acf/prepare_field/key=field_6238c41b168b9', array( $this, 'set_readonly_fields' ), 10, 1 ); // quote_number
 		add_filter( 'acf/prepare_field/key=field_6238c64170fcd', array( $this, 'set_readonly_fields' ), 10, 1 ); // starting_quote_number
+		add_filter( 'acf/prepare_field/key=field_681cf2f000002', array( $this, 'set_readonly_fields' ), 10, 1 ); // quote_form_id
+		add_filter( 'acf/prepare_field/key=field_681cf2f000003', array( $this, 'set_readonly_fields' ), 10, 1 ); // quote_pdf_id
+		add_filter( 'acf/prepare_field/key=field_681cf2f000004', array( $this, 'set_readonly_fields' ), 10, 1 ); // routing_pdf_id
 		add_filter( 'acf/prepare_field/key=field_6192c9c5293bc', array( $this, 'set_readonly_fields' ), 10, 1 ); // area_computed
 		add_filter( 'acf/prepare_field/key=field_6192c9e4293bd', array( $this, 'set_readonly_fields' ), 10, 1 ); // volume_computed
 		add_filter( 'acf/prepare_field/key=field_6193eada83418', array( $this, 'set_readonly_fields' ), 10, 1 ); // d_x_computed
@@ -66,7 +68,7 @@ class PC_CPQ_Custom_Fields extends MVC_Controller_Registry
 		add_filter( 'acf/format_value/key=field_610ab269c1806', array( $this, 'uc_names' ), 10, 3 );
 
 		add_action( 'acf/save_post', array( $this, 'update_quote_number' ), 10, 1 );
-		
+
 		add_filter( 'posts_where', [ $this, 'posts_where_contacts_email' ], 10, 1 );
 	}
 
@@ -140,6 +142,26 @@ class PC_CPQ_Custom_Fields extends MVC_Controller_Registry
 			case 'post_ops_order':
 				$field['readonly'] = true;
 				break;
+			case 'starting_quote_number':
+				if ( '' !== PC_CPQ()->Settings()->get_starting_quote_number() ) {
+					$field['readonly'] = true;
+				}
+				break;
+			case 'quote_form_id':
+				if ( 0 < PC_CPQ()->Settings()->get_quote_form_id() ) {
+					$field['readonly'] = true;
+				}
+				break;
+			case 'quote_pdf_id':
+				if ( '' !== PC_CPQ()->Settings()->get_quote_pdf_id() ) {
+					$field['readonly'] = true;
+				}
+				break;
+			case 'routing_pdf_id':
+				if ( '' !== PC_CPQ()->Settings()->get_routing_pdf_id() ) {
+					$field['readonly'] = true;
+				}
+				break;
 			default:
 				if ( $field['value'] != '' && $field['value'] != 0 ) {
 					$field['readonly'] = true;
@@ -154,7 +176,7 @@ class PC_CPQ_Custom_Fields extends MVC_Controller_Registry
 		$choices = array();
 		$metals = PC_CPQ()->Settings()->get_Metals();
 		if ( ! empty( $metals ) ) {
-			$choices = array_map( function( $Metal ) {
+			$choices = array_map( function ( $Metal ) {
 				return $Metal->get_name();
 			}, $metals );
 		}
@@ -169,7 +191,7 @@ class PC_CPQ_Custom_Fields extends MVC_Controller_Registry
 		$default_choices = array( 'None' );
 		$plating_metals = is_admin() ? PC_CPQ()->Settings()->get_Plating_Metals() : PC_CPQ()->Settings()->get_Available_Plating_Metals();
 		if ( $plating_metals ) {
-			$choices = array_map( function( $Plating_Metal ) {
+			$choices = array_map( function ( $Plating_Metal ) {
 				return $Plating_Metal->get_name();
 			}, $plating_metals );
 		}
@@ -182,11 +204,7 @@ class PC_CPQ_Custom_Fields extends MVC_Controller_Registry
 
 	public function load_line_choices( $field )
 	{
-		$choices = array();
-		$lines = Constants::$lines;
-		if ( $lines ) {
-			$choices = Constants::get_col( 'name', $lines );
-		}
+		$choices = PC_CPQ()->Settings()->get_line_names();
 
 		$field['choices'] = array_combine( $choices, $choices );
 
@@ -195,11 +213,7 @@ class PC_CPQ_Custom_Fields extends MVC_Controller_Registry
 
 	public function load_barrel_choices( $field )
 	{
-		$choices = array();
-		$barrels = Constants::$barrels;
-		if ( $barrels ) {
-			$choices = Constants::get_col( 'name', $barrels );
-		}
+		$choices = PC_CPQ()->Settings()->get_barrel_names();
 
 		$field['choices'] = array_combine( $choices, $choices );
 
@@ -208,11 +222,7 @@ class PC_CPQ_Custom_Fields extends MVC_Controller_Registry
 
 	public function load_rack_choices( $field )
 	{
-		$choices = array();
-		$racks = Constants::$racks;
-		if ( $racks ) {
-			$choices = Constants::get_col( 'name', $racks );
-		}
+		$choices = PC_CPQ()->Settings()->get_rack_names();
 
 		$field['choices'] = array_combine( $choices, $choices );
 
@@ -222,17 +232,8 @@ class PC_CPQ_Custom_Fields extends MVC_Controller_Registry
 	public function load_tool_choices( $field )
 	{
 		$choices = array();
-		$barrel_choices = array();
-		$rack_choices = array();
-		$barrels = Constants::$barrels;
-		$racks = Constants::$racks;
-		if ( $barrels ) {
-			$barrel_choices = Constants::get_col( 'name', $barrels );
-		}
-
-		if ( $racks ) {
-			$rack_choices = Constants::get_col( 'name', $racks );
-		}
+		$barrel_choices = PC_CPQ()->Settings()->get_barrel_names();
+		$rack_choices = PC_CPQ()->Settings()->get_rack_names();
 		$choices = array_merge( $barrel_choices, $rack_choices );
 
 		$field['choices'] = array_combine( $choices, $choices );
@@ -242,11 +243,7 @@ class PC_CPQ_Custom_Fields extends MVC_Controller_Registry
 
 	public function load_operation_choices( $field )
 	{
-		$choices = array();
-		$operations = Constants::$operations;
-		if ( $operations ) {
-			$choices = Constants::get_col( 'operation', $operations );
-		}
+		$choices = PC_CPQ()->Settings()->get_operation_names();
 
 		$field['choices'] = array_combine( $choices, $choices );
 
@@ -256,24 +253,24 @@ class PC_CPQ_Custom_Fields extends MVC_Controller_Registry
 	public function load_email_template_choices( $field )
 	{
 		$choices = array();
-		$email_templates = Constants::$email_templates;
+		$email_templates = PC_CPQ()->Settings()->get_email_template_names();
 		if ( $email_templates ) {
 			$default_choices = array( 'Select a template' );
-			$choices = array_merge( $default_choices, Constants::get_col( 'name', $email_templates ) );
+			$choices = array_merge( $default_choices, $email_templates );
 		}
 
 		$field['choices'] = array_combine( $choices, $choices );
 
 		return $field;
 	}
-	
+
 	public function load_fee_choices( $field )
 	{
 		$choices = array();
 		$fees = PC_CPQ()->Settings()->get_Fees();
 		if ( ! empty( $fees ) ) {
 			$default_choices = [ 'Select a fee' ];
-			$raw_choices = array_map( function( $Fee ) {
+			$raw_choices = array_map( function ( $Fee ) {
 				return $Fee->get_name();
 			}, $fees );
 			$choices = array_merge( $default_choices, $raw_choices );
@@ -342,13 +339,12 @@ class PC_CPQ_Custom_Fields extends MVC_Controller_Registry
 		$part = $part_data[$key];
 
 		if ( ! empty( $part['processes'] ) ) {
-			$recipes = Constants::$recipes;
+			$recipes = PC_CPQ()->Settings()->get_recipes_by_base_metal( $part['base_metal'] );
 			$metals = wp_list_pluck( $part['processes'], 'metal' );
 
 			if ( ! empty( $recipes ) ) {
-				$recipes_by_base_metal = Constants::filter_rows( array( 'base_metal' => $part['base_metal'] ), $recipes );
-				if ( ! empty( $recipes_by_base_metal ) ) {
-					foreach ( $recipes_by_base_metal as $key => $recipe ) {
+				if ( ! empty( $recipes ) ) {
+					foreach ( $recipes as $key => $recipe ) {
 						$arr = array_values( array_filter( $recipe, function ( $v, $k ) {
 								return strpos( $k, 'process_' ) === 0 && $v != '';
 							}, ARRAY_FILTER_USE_BOTH ) );
@@ -363,7 +359,7 @@ class PC_CPQ_Custom_Fields extends MVC_Controller_Registry
 						if ( $field_key == 'field_6192cf16293ca' || $field_key == 'field_6192d2e1b5cbe' ) {
 							$field_name = 'plating_tool';
 						}
-						$value = $recipes_by_base_metal[$matching_key][$field_name];
+						$value = $recipes[$matching_key][$field_name];
 					}
 				}
 			}
@@ -390,14 +386,11 @@ class PC_CPQ_Custom_Fields extends MVC_Controller_Registry
 			'pricing_units' => null,
 		);
 
-		$metals = Constants::$metals;
-		if ( $metals ) {
-			$config['metals'] = Constants::get_col( 'name', $metals );
-		}
+		$config['metals'] = PC_CPQ()->Settings()->get_metal_names();
 
-		$plating_metals = Constants::$available_plating_metals;
+		$plating_metals = PC_CPQ()->Settings()->get_plating_metal_names( false );
 		if ( $plating_metals ) {
-			$config['plating_metals'] = Constants::get_col( 'name', $plating_metals );
+			$config['plating_metals'] = $plating_metals;
 		}
 
 		$config['pricing_units'] = \PC_CPQ\Models\Part_Pricing_Inputs::get_price_units();

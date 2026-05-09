@@ -1,8 +1,14 @@
-<div id="edit-lead">
+<div id="edit-lead" class="js-post-lock-scope">
+	<div
+		class="js-post-lock-root mb-3"
+		data-post-lock="<?php echo esc_attr( wp_json_encode( isset( $post_lock ) ? $post_lock : array() ) ); ?>"
+	>
+		<div class="alert alert-warning js-post-lock-alert d-none mb-0"></div>
+	</div>
 	<form action="" method="post" class="js-edit-lead-form">
 		<div class="row">
 			<div class="col-md-4">
-				<div class="card">
+				<div class="card" id="lead-details-card">
 					<div class="card-header">
 						<h3 class="card-title">Details</h3>
 						<div class="card-tools">
@@ -22,12 +28,16 @@
 						<?php echo pc_cpq_get_input_html( 'certification', $Lead ); ?>
 						<?php echo pc_cpq_get_input_html( 'include_metal_factor', $Lead ); ?>
 						<?php echo pc_cpq_get_input_html( 'notes', $Lead ); ?>
-						<?php echo PC_CPQ()->view( 'manage/fields/nutshell-input', [ 'Lead' => $Lead ] ); ?>
+						<?php
+							if ( PC_CPQ()->Settings()->is_nutshell_enabled() ) {
+								echo PC_CPQ()->view( 'manage/fields/nutshell-input', [ 'Lead' => $Lead ] );
+							}
+						?>
 					</div>
 					<!-- /.card-body -->
 				</div>
 				<!-- /.card -->
-				<div class="card">
+				<div class="card" id="lead-contact-card">
 					<div class="card-header">
 						<h3 class="card-title">Contact</h3>
 						<div class="card-tools">
@@ -50,7 +60,7 @@
 			</div>
 			<div class="col-md-5">
 				<?php if ( $Lead->get_id() ) : ?>
-				<div class="card">
+				<div class="card" id="lead-parts-card">
 					<div class="card-header">
 						<h3 class="card-title">Parts</h3>
 						<div class="card-tools">
@@ -80,19 +90,22 @@
 			</div>
 			<div class="col-md-3">
 				<?php echo PC_CPQ()->view( 'manage/partials/save-alerts' ); ?>
-				<div class="card">
+				<div class="card" id="lead-quote-card">
 					<div class="card-header">
 						<h3 class="card-title">Quote</h3>
 					</div>
 					<div class="card-body p-0">
 						<?php echo PC_CPQ()->view( 'manage/partials/quote-details', $data ); ?>
 					</div>
+					<div class="card-body border-top">
+						<?php echo pc_cpq_get_input_html( 'pricing_mode', $Lead ); ?>
+					</div>
 					<!-- /.card-body -->
 					<div class="card-footer">
 						<?php wp_nonce_field( 'edit_lead', 'edit_lead_nonce' ); ?>
 						<input type="hidden" name="lead_id" value="<?php echo $Lead->get_id(); ?>" />
 						<input type="submit" value="Save Changes" class="btn btn-success float-right js-edit-lead-submit">
-						<button type="button" class="btn btn-primary js-prepare-quote" data-toggle="modal" data-target="#prepare-quote-modal" disabled>Prepare New Quote</button>
+						<button type="button" id="lead-prepare-quote-button" class="btn btn-primary js-prepare-quote" data-toggle="modal" data-target="#prepare-quote-modal" disabled>Prepare New Quote</button>
 					</div>
 					<!-- /.card-footer -->
 				</div>
@@ -134,3 +147,36 @@
 		}
 	?>
 </div>
+
+<template id="part-file-preview-modal-template">
+	<div class="modal fade" id="part-file-preview-modal" tabindex="-1" role="dialog" aria-hidden="true">
+		<div class="modal-dialog modal-xl modal-dialog-centered part-file-preview-modal" role="document">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h5 class="modal-title">File Preview</h5>
+					<div class="part-file-preview-modal__tools d-flex align-items-center mx-3 d-none">
+						<div class="btn-group btn-group-sm" role="group" aria-label="Image zoom controls">
+							<button type="button" class="btn btn-outline-primary js-file-preview-zoom-out">-</button>
+							<button type="button" class="btn btn-outline-primary js-file-preview-zoom-reset">Reset</button>
+							<button type="button" class="btn btn-outline-primary js-file-preview-zoom-in">+</button>
+						</div>
+					</div>
+					<button type="button" class="close" data-dismiss="modal" aria-label="Close">
+						<span aria-hidden="true">&times;</span>
+					</button>
+				</div>
+				<div class="modal-body part-file-preview-modal__body"></div>
+			</div>
+		</div>
+	</div>
+</template>
+
+<template id="part-file-preview-pdf-template">
+	<iframe class="part-file-preview-modal__iframe" src="{{url}}" title="{{name}}"></iframe>
+</template>
+
+<template id="part-file-preview-image-template">
+	<div class="part-file-preview-modal__image-wrap">
+		<img class="part-file-preview-modal__image" src="{{url}}" alt="{{name}}" />
+	</div>
+</template>

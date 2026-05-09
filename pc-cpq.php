@@ -55,6 +55,12 @@ final class PC_CPQ
 	public $settings = null;
 
 	/**
+	 * PDF configuration
+	 * @var null
+	 */
+	public $pdf_config = null;
+
+	/**
 	 * Plugin instance.
 	 * @see instance()
 	 * @type object
@@ -181,18 +187,19 @@ final class PC_CPQ
 		include_once $this->plugin_path() . '/includes/helpers/general-functions.php';
 		include_once $this->plugin_path() . '/includes/helpers/template-functions.php';
 		include_once $this->plugin_path() . '/includes/helpers/csv-import-export-options.php';
-		include_once $this->plugin_path() . '/includes/helpers/access.php';
-		include_once $this->plugin_path() . '/includes/helpers/constants.php';
-		include_once $this->plugin_path() . '/includes/helpers/defaults.php';
 		include_once $this->plugin_path() . '/includes/helpers/form-handler.php';
 		include_once $this->plugin_path() . '/includes/helpers/geometry.php';
-		include_once $this->plugin_path() . '/includes/helpers/quotes.php';
 		include_once $this->plugin_path() . '/includes/helpers/translate.php';
-		include_once $this->plugin_path() . '/includes/helpers/utilities.php';
 		
 		// models
 		include_once $this->plugin_path() . '/includes/models/Site.php';
+		include_once $this->plugin_path() . '/includes/models/User.php';
+		include_once $this->plugin_path() . '/includes/models/Workspace_Users.php';
 		include_once $this->plugin_path() . '/includes/models/Settings.php';
+		include_once $this->plugin_path() . '/includes/models/Pdf_Config.php';
+		include_once $this->plugin_path() . '/includes/models/Dashboard.php';
+		include_once $this->plugin_path() . '/includes/models/Reports.php';
+		include_once $this->plugin_path() . '/includes/models/Post_Lock.php';
 		include_once $this->plugin_path() . '/includes/models/settings/Email_Template.php';
 		include_once $this->plugin_path() . '/includes/models/settings/Metal.php';
 		include_once $this->plugin_path() . '/includes/models/settings/Plating_Metal.php';
@@ -224,6 +231,12 @@ final class PC_CPQ
 		include_once $this->plugin_path() . '/includes/core/customer-factory.php';
 		include_once $this->plugin_path() . '/includes/core/part-lookup.php';
 		include_once $this->plugin_path() . '/includes/core/nutshell-service.php';
+		include_once $this->plugin_path() . '/includes/core/pricing/pricing-context.php';
+		include_once $this->plugin_path() . '/includes/core/pricing/pricing-result.php';
+		include_once $this->plugin_path() . '/includes/core/pricing/strategies/pricing-strategy-interface.php';
+		include_once $this->plugin_path() . '/includes/core/pricing/strategies/cost-plus-pricing-strategy.php';
+		include_once $this->plugin_path() . '/includes/core/pricing/strategies/utilization-pricing-strategy.php';
+		include_once $this->plugin_path() . '/includes/core/pricing/pricing-calculator.php';
 		include_once $this->plugin_path() . '/includes/core/pricing/Elasticity_Service.php';
 		include_once $this->plugin_path() . '/includes/core/pricing/Pricing_Validator.php';
 		include_once $this->plugin_path() . '/includes/core/approval/Override_Gate.php';
@@ -231,6 +244,7 @@ final class PC_CPQ
 		// frontend
 		include_once $this->plugin_path() . '/includes/controllers/pc-cpq-custom-fields.php';
 		include_once $this->plugin_path() . '/includes/controllers/pc-cpq-forms.php';
+		include_once $this->plugin_path() . '/includes/controllers/pc-cpq-lock.php';
 		include_once $this->plugin_path() . '/includes/controllers/pc-cpq-template.php';
 		
 		// manage
@@ -315,6 +329,16 @@ final class PC_CPQ
 		}
 		return new \PC_CPQ\Models\Site( $site_id );
 	}
+
+	public function User( $user = null )
+	{
+		return new \PC_CPQ\Models\User( $user );
+	}
+
+	public function Workspace_Users()
+	{
+		return new \PC_CPQ\Models\Workspace_Users();
+	}
 	
 	public function Settings()
 	{
@@ -322,6 +346,30 @@ final class PC_CPQ
 			$this->settings = new \PC_CPQ\Models\Settings();
 		}
 		return $this->settings;
+	}
+
+	public function Reports()
+	{
+		return new \PC_CPQ\Models\Reports();
+	}
+
+	public function Pdf_Config()
+	{
+		if ( null === $this->pdf_config ) {
+			$this->pdf_config = new \PC_CPQ\Models\Pdf_Config();
+		}
+
+		return $this->pdf_config;
+	}
+
+	public function Post_Lock()
+	{
+		return new \PC_CPQ\Models\Post_Lock();
+	}
+
+	public function Dashboard()
+	{
+		return new \PC_CPQ\Models\Dashboard();
 	}
 
 	public function debug_log()

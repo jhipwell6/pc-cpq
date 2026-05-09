@@ -4,10 +4,7 @@ namespace PC_CPQ\Controllers;
 
 use \WP_MVC\Controllers\Abstracts\MVC_Controller_Registry;
 use \PC_CPQ\Core\Nutshell_Service;
-use \PC_CPQ\Helpers\Constants;
-use \PC_CPQ\Helpers\Access;
 use \PC_CPQ\Helpers\Geometry;
-use \PC_CPQ\Helpers\Utilities;
 use PC_CPQ\Models\Customer;
 use PC_CPQ\Models\Part_Pricing_Inputs;
 
@@ -16,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) )
 
 class PC_CPQ_Forms extends MVC_Controller_Registry
 {
-	const QUOTE_FORM_ID = 1;
+	protected $quote_form_id = 1;
 
 	/**
 	 * Initializes variables and sets up WordPress hooks/actions.
@@ -25,18 +22,20 @@ class PC_CPQ_Forms extends MVC_Controller_Registry
 	 */
 	protected function __construct()
 	{		
+		$this->quote_form_id = PC_CPQ()->Pdf_Config()->get_quote_form_id();
+
 		add_filter( 'gform_field_content', array( $this, 'create_select_optgroup' ), 10, 2 );
-		add_action( 'gform_advancedpostcreation_post_after_creation_' . self::QUOTE_FORM_ID, array( $this, 'update_parts_lead_data' ), 10, 4 );
-		add_action( 'gform_advancedpostcreation_post_after_creation_' . self::QUOTE_FORM_ID, array( $this, 'update_business_lead_data' ), 10, 4 );
-		add_action( 'gform_advancedpostcreation_post_after_creation_' . self::QUOTE_FORM_ID, array( $this, 'update_quantities_lead_data' ), 10, 4 );
-		add_action( 'gform_advancedpostcreation_post_after_creation_' . self::QUOTE_FORM_ID, array( $this, 'update_lead_is_authorized_meta' ), 10, 4 );
-		add_action( 'gform_advancedpostcreation_post_after_creation_' . self::QUOTE_FORM_ID, array( $this, 'update_quote_number' ), 10, 4 );
-		add_action( 'gform_advancedpostcreation_post_after_creation_' . self::QUOTE_FORM_ID, array( $this, 'save_customer_data' ), 10, 4 );
-		add_action( 'gform_advancedpostcreation_post_after_creation_' . self::QUOTE_FORM_ID, array( $this, 'send_to_nutshell' ), 20, 4 );
-		add_action( 'gform_advancedpostcreation_post_after_creation_' . self::QUOTE_FORM_ID, array( $this, 'add_parts_to_index' ), 10, 4 );
+		add_action( 'gform_advancedpostcreation_post_after_creation_' . $this->quote_form_id, array( $this, 'update_parts_lead_data' ), 10, 4 );
+		add_action( 'gform_advancedpostcreation_post_after_creation_' . $this->quote_form_id, array( $this, 'update_business_lead_data' ), 10, 4 );
+		add_action( 'gform_advancedpostcreation_post_after_creation_' . $this->quote_form_id, array( $this, 'update_quantities_lead_data' ), 10, 4 );
+		add_action( 'gform_advancedpostcreation_post_after_creation_' . $this->quote_form_id, array( $this, 'update_lead_is_authorized_meta' ), 10, 4 );
+		add_action( 'gform_advancedpostcreation_post_after_creation_' . $this->quote_form_id, array( $this, 'update_quote_number' ), 10, 4 );
+		add_action( 'gform_advancedpostcreation_post_after_creation_' . $this->quote_form_id, array( $this, 'save_customer_data' ), 10, 4 );
+		add_action( 'gform_advancedpostcreation_post_after_creation_' . $this->quote_form_id, array( $this, 'send_to_nutshell' ), 20, 4 );
+		add_action( 'gform_advancedpostcreation_post_after_creation_' . $this->quote_form_id, array( $this, 'add_parts_to_index' ), 10, 4 );
 		add_filter( 'gform_email_background_color_label', array( $this, 'set_email_label_color' ), 10, 3 );
 		add_filter( 'gform_entry_meta', array( $this, 'entry_is_authorized_meta' ), 10, 2 );
-		add_filter( 'gform_field_content_' . self::QUOTE_FORM_ID . '_11', array( $this, 'modify_upload_field' ), 10, 5 );
+		add_filter( 'gform_field_content_' . $this->quote_form_id . '_11', array( $this, 'modify_upload_field' ), 10, 5 );
 
 		add_filter( 'gform_confirmation', array( $this, 'maybe_get_company_details' ), 10, 4 );
 		add_action( 'gform_after_submission', array( $this, 'save_company_details_to_customer' ), 10, 2 );
@@ -64,7 +63,7 @@ class PC_CPQ_Forms extends MVC_Controller_Registry
 
 	public function maybe_get_company_details( $confirmation, $form, $entry, $ajax )
 	{
-		if ( $form['id'] == self::QUOTE_FORM_ID ) {
+		if ( intval( $form['id'] ) === intval( $this->quote_form_id ) ) {
 			$created_posts = gform_get_meta( $entry['id'], 'gravityformsadvancedpostcreation_post_id' );
 			if ( ! empty( $created_posts ) ) {
 				$post_id = array_first( $created_posts );
@@ -174,7 +173,7 @@ class PC_CPQ_Forms extends MVC_Controller_Registry
 				$data[$i] = array();
 				$pricing = [];
 				foreach ( $part_arr as $key => $value ) {
-					$new_key = Utilities::decamelize( $key );
+					$new_key = decamelize( $key );
 					switch ( $new_key ) {
 						case 'area':
 						case 'area_computed':
@@ -407,7 +406,7 @@ class PC_CPQ_Forms extends MVC_Controller_Registry
 		$email_field_id = 3;
 		$email = rgar( $entry, $email_field_id );
 
-		return Access::is_whitelisted( $email );
+		return PC_CPQ()->Settings()->is_whitelisted( $email );
 	}
 
 	public function modify_upload_field( $content, $field, $value, $lead_id, $form_id )

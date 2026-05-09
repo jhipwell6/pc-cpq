@@ -112,3 +112,26 @@ table .pc-cpq-col--ops {
 	vertical-align: top;
 	padding: 5px;
 }
+
+.pc-cpq-pdf-layout--compact {
+	font-size: 92%;
+}
+
+.pc-cpq-pdf-layout--compact .pc-cpq-row {
+	margin-bottom: 6px;
+	padding-bottom: 6px;
+}
+
+.pc-cpq-pdf-layout--compact .parts-table td,
+.pc-cpq-pdf-layout--compact .parts-table th,
+.pc-cpq-pdf-layout--compact .parts-table__nested th,
+.pc-cpq-pdf-layout--compact .parts-table__nested td,
+.pc-cpq-pdf-layout--compact .pc-cpq-table--ops th,
+.pc-cpq-pdf-layout--compact .pc-cpq-table--ops td {
+	padding: 3px 4px;
+}
+
+.pc-cpq-pdf-layout--compact hr,
+.pc-cpq-pdf-layout--compact br {
+	line-height: 0.8;
+}

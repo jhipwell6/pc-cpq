@@ -54,6 +54,23 @@
 					<?php endif; ?>
 				</td>
 			</tr>
+			<?php if ( $Lead->has_quote_snapshot() ) : ?>
+			<tr>
+				<th>Snapshot</th>
+				<td class="text-right">
+					<div class="d-inline-block text-left">
+						<div>
+							<span class="mr-2">Locked</span>
+							<?php wp_nonce_field( 'requote', 'requote_nonce' ); ?>
+							<button type="button" class="btn btn-xs btn-primary js-requote" title="Refresh quoted values from the current saved lead">
+								Requote
+							</button>
+						</div>
+						<small class="text-muted d-block mt-1">Quoted pricing, routing, fees, and terms are frozen until you requote.</small>
+					</div>
+				</td>
+			</tr>
+			<?php endif; ?>
 		</tbody>
 	</table>
 </div>

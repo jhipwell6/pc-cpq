@@ -3,6 +3,7 @@
 namespace PC_CPQ\Models;
 
 use \WP_MVC\Models\Abstracts\Abstract_Model;
+use PC_CPQ\Core\Pricing\Pricing_Calculator;
 
 if ( ! defined( 'ABSPATH' ) )
 	exit;
@@ -20,6 +21,12 @@ class Settings extends Abstract_Model
 	protected $default_shift;
 	protected $default_break_in;
 	protected $default_metal_adder;
+	protected $default_pricing_mode;
+	protected $onboarding_completed_at;
+	protected $enabled_integrations;
+	protected $nutshell_account_name;
+	protected $nutshell_api_user;
+	protected $nutshell_api_key;
 
 	/*
 	 * Quotes
@@ -36,6 +43,14 @@ class Settings extends Abstract_Model
 	protected $quote_header;
 	protected $quote_footer;
 	protected $quote_terms;
+	protected $quote_form_id;
+	protected $quote_pdf_id;
+	protected $routing_pdf_id;
+	protected $quote_pdf_layout;
+	protected $routing_pdf_layout;
+	protected $custom_site_head;
+	protected $custom_site_css;
+	protected $custom_site_body;
 	protected static $Email_Template_Class = 'PC_CPQ\Models\Settings\Email_Template';
 	protected $raw_email_templates;
 	protected $Email_Templates;
@@ -62,6 +77,7 @@ class Settings extends Abstract_Model
 	protected static $Operation_Class = 'PC_CPQ\Models\Settings\Operation';
 	protected $raw_operations;
 	protected $Operations;
+	protected $raw_recipes;
 	protected $Post_Operations;
 	protected $post_ops_order;
 	
@@ -78,95 +94,197 @@ class Settings extends Abstract_Model
 
 	public function get_hourly_rate()
 	{
-		return $this->get_prop( 'hourly_rate' );
+		return $this->get_float_prop( 'hourly_rate' );
 	}
 
 	public function get_default_margin()
 	{
-		return $this->get_prop( 'default_margin' );
+		return $this->get_float_prop( 'default_margin' );
 	}
 
 	public function get_default_eff()
 	{
-		return $this->get_prop( 'default_eff' );
+		return $this->get_float_prop( 'default_eff' );
 	}
 
 	public function get_default_people()
 	{
-		return $this->get_prop( 'default_people' );
+		return $this->get_float_prop( 'default_people' );
 	}
 
 	public function get_default_eau()
 	{
-		return $this->get_prop( 'default_eau' );
+		return $this->get_float_prop( 'default_eau' );
 	}
 
 	public function get_default_shift()
 	{
-		return $this->get_prop( 'default_shift' );
+		return $this->get_int_prop( 'default_shift' );
 	}
 
 	public function get_default_break_in()
 	{
-		return $this->get_prop( 'default_break_in' );
+		return $this->get_float_prop( 'default_break_in' );
 	}
 
 	public function get_default_metal_adder()
 	{
-		return $this->get_prop( 'default_metal_adder' );
+		return $this->get_float_prop( 'default_metal_adder' );
+	}
+
+	public function get_default_pricing_mode()
+	{
+		if ( null === $this->default_pricing_mode || '' === $this->default_pricing_mode || false === $this->default_pricing_mode ) {
+			$this->default_pricing_mode = $this->get_meta( 'default_pricing_mode' );
+		}
+
+		return Pricing_Calculator::sanitize_mode( $this->get_string_prop( 'default_pricing_mode', Pricing_Calculator::MODE_UTILIZATION ) );
+	}
+
+	public function get_onboarding_completed_at()
+	{
+		return $this->get_string_prop( 'onboarding_completed_at' );
+	}
+
+	public function get_enabled_integrations()
+	{
+		if ( null === $this->enabled_integrations || false === $this->enabled_integrations ) {
+			$this->enabled_integrations = $this->get_meta( 'enabled_integrations' );
+		}
+
+		$value = $this->get_prop( 'enabled_integrations' );
+		if ( empty( $value ) ) {
+			return array();
+		}
+
+		if ( is_array( $value ) ) {
+			return array_values( array_filter( array_map( 'sanitize_key', $value ) ) );
+		}
+
+		$single = sanitize_key( (string) $value );
+		return '' !== $single ? array( $single ) : array();
+	}
+
+	public function get_nutshell_account_name()
+	{
+		if ( null === $this->nutshell_account_name || false === $this->nutshell_account_name ) {
+			$this->nutshell_account_name = $this->get_meta( 'nutshell_account_name' );
+		}
+
+		return $this->get_string_prop( 'nutshell_account_name' );
+	}
+
+	public function get_nutshell_api_user()
+	{
+		if ( null === $this->nutshell_api_user || false === $this->nutshell_api_user ) {
+			$this->nutshell_api_user = $this->get_meta( 'nutshell_api_user' );
+		}
+
+		return $this->get_string_prop( 'nutshell_api_user' );
+	}
+
+	public function get_nutshell_api_key()
+	{
+		if ( null === $this->nutshell_api_key || false === $this->nutshell_api_key ) {
+			$this->nutshell_api_key = $this->get_meta( 'nutshell_api_key' );
+		}
+
+		return $this->get_string_prop( 'nutshell_api_key' );
 	}
 	
 	public function get_starting_quote_number()
 	{
-		return $this->get_prop( 'starting_quote_number' );
+		return $this->get_digit_string_prop( 'starting_quote_number' );
 	}
 	
 	public function get_quote_expires_after()
 	{
-		return $this->get_prop( 'quote_expires_after' );
+		return $this->get_int_prop( 'quote_expires_after' );
 	}
 	
 	public function get_follow_up_after()
 	{
-		return $this->get_prop( 'follow_up_after' );
+		return $this->get_int_prop( 'follow_up_after' );
 	}
 	
 	public function get_domain_whitelist()
 	{
-		return $this->get_prop( 'domain_whitelist' );
+		return $this->get_string_prop( 'domain_whitelist' );
 	}
 	
 	public function get_email_whitelist()
 	{
-		return $this->get_prop( 'email_whitelist' );
+		return $this->get_string_prop( 'email_whitelist' );
 	}
 	
 	public function get_quote_header()
 	{
-		return $this->get_prop( 'quote_header' );
+		return $this->get_string_prop( 'quote_header' );
 	}
 	
 	public function get_quote_footer()
 	{
-		return $this->get_prop( 'quote_footer' );
+		return $this->get_string_prop( 'quote_footer' );
 	}
 	
 	public function get_quote_terms()
 	{
-		return $this->get_prop( 'quote_terms' );
+		return $this->get_string_prop( 'quote_terms' );
+	}
+
+	public function get_quote_form_id()
+	{
+		return $this->get_int_prop( 'quote_form_id' );
+	}
+
+	public function get_quote_pdf_id()
+	{
+		return $this->get_string_prop( 'quote_pdf_id' );
+	}
+
+	public function get_routing_pdf_id()
+	{
+		return $this->get_string_prop( 'routing_pdf_id' );
+	}
+
+	public function get_quote_pdf_layout()
+	{
+		$value = sanitize_key( $this->get_string_prop( 'quote_pdf_layout', 'standard' ) );
+		return in_array( $value, array( 'standard', 'compact' ), true ) ? $value : 'standard';
+	}
+
+	public function get_routing_pdf_layout()
+	{
+		$value = sanitize_key( $this->get_string_prop( 'routing_pdf_layout', 'standard' ) );
+		return in_array( $value, array( 'standard', 'compact' ), true ) ? $value : 'standard';
+	}
+
+	public function get_custom_site_head()
+	{
+		return $this->get_string_prop( 'custom_site_head' );
+	}
+
+	public function get_custom_site_css()
+	{
+		return $this->get_string_prop( 'custom_site_css' );
+	}
+
+	public function get_custom_site_body()
+	{
+		return $this->get_string_prop( 'custom_site_body' );
 	}
 
 	public function get_raw_email_templates()
 	{
 		if ( null === $this->raw_email_templates ) {
-			$this->raw_email_templates = $this->get_meta( 'email_templates' );
+			$this->raw_email_templates = $this->get_collection_meta( 'email_templates' );
 		}
 		return $this->raw_email_templates;
 	}
 
 	public function get_Email_Templates( $force_update = false )
 	{
-		if ( null === $this->Email_Templates ) {
+		if ( null === $this->Email_Templates || $force_update ) {
 			$this->Email_Templates = array();
 			if ( ! empty( $this->get_raw_email_templates() ) ) {
 				foreach ( $this->get_raw_email_templates() as $index => $raw_email_template ) {
@@ -180,14 +298,14 @@ class Settings extends Abstract_Model
 	public function get_raw_metals()
 	{
 		if ( null === $this->raw_metals ) {
-			$this->raw_metals = $this->get_meta( 'metals' );
+			$this->raw_metals = $this->get_collection_meta( 'metals' );
 		}
 		return $this->raw_metals;
 	}
 
 	public function get_Metals( $force_update = false )
 	{
-		if ( null === $this->Metals ) {
+		if ( null === $this->Metals || $force_update ) {
 			$this->Metals = array();
 			if ( ! empty( $this->get_raw_metals() ) ) {
 				foreach ( $this->get_raw_metals() as $index => $raw_metal ) {
@@ -201,14 +319,14 @@ class Settings extends Abstract_Model
 	public function get_raw_plating_metals()
 	{
 		if ( null === $this->raw_plating_metals ) {
-			$this->raw_plating_metals = $this->get_meta( 'plating_metals' );
+			$this->raw_plating_metals = $this->get_collection_meta( 'plating_metals' );
 		}
 		return $this->raw_plating_metals;
 	}
 
 	public function get_Plating_Metals( $force_update = false )
 	{
-		if ( null === $this->Plating_Metals ) {
+		if ( null === $this->Plating_Metals || $force_update ) {
 			$this->Plating_Metals = array();
 			if ( ! empty( $this->get_raw_plating_metals() ) ) {
 				foreach ( $this->get_raw_plating_metals() as $index => $raw_plating_metal ) {
@@ -225,18 +343,29 @@ class Settings extends Abstract_Model
 			return ! $Plating_Metal->is_hidden();
 		} );
 	}
+
+	public function get_metal_names()
+	{
+		return $this->get_collection_column( $this->get_raw_metals(), 'name' );
+	}
+
+	public function get_plating_metal_names( $include_hidden = true )
+	{
+		$metals = $include_hidden ? $this->get_raw_plating_metals() : $this->get_available_plating_metal_rows();
+		return $this->get_collection_column( $metals, 'name' );
+	}
 	
 	public function get_raw_lines()
 	{
 		if ( null === $this->raw_lines ) {
-			$this->raw_lines = $this->get_meta( 'lines' );
+			$this->raw_lines = $this->get_collection_meta( 'lines' );
 		}
 		return $this->raw_lines;
 	}
 
 	public function get_Lines( $force_update = false )
 	{
-		if ( null === $this->Lines ) {
+		if ( null === $this->Lines || $force_update ) {
 			$this->Lines = array();
 			if ( ! empty( $this->get_raw_lines() ) ) {
 				foreach ( $this->get_raw_lines() as $index => $raw_line ) {
@@ -246,18 +375,23 @@ class Settings extends Abstract_Model
 		}
 		return $this->Lines;
 	}
+
+	public function get_line_names()
+	{
+		return $this->get_collection_column( $this->get_raw_lines(), 'name' );
+	}
 	
 	public function get_raw_barrels()
 	{
 		if ( null === $this->raw_barrels ) {
-			$this->raw_barrels = $this->get_meta( 'barrels' );
+			$this->raw_barrels = $this->get_collection_meta( 'barrels' );
 		}
 		return $this->raw_barrels;
 	}
 
 	public function get_Barrels( $force_update = false )
 	{
-		if ( null === $this->Barrels ) {
+		if ( null === $this->Barrels || $force_update ) {
 			$this->Barrels = array();
 			if ( ! empty( $this->get_raw_barrels() ) ) {
 				foreach ( $this->get_raw_barrels() as $index => $raw_barrel ) {
@@ -267,18 +401,23 @@ class Settings extends Abstract_Model
 		}
 		return $this->Barrels;
 	}
+
+	public function get_barrel_names()
+	{
+		return $this->get_collection_column( $this->get_raw_barrels(), 'name' );
+	}
 	
 	public function get_raw_racks()
 	{
 		if ( null === $this->raw_racks ) {
-			$this->raw_racks = $this->get_meta( 'racks' );
+			$this->raw_racks = $this->get_collection_meta( 'racks' );
 		}
 		return $this->raw_racks;
 	}
 
 	public function get_Racks( $force_update = false )
 	{
-		if ( null === $this->Racks ) {
+		if ( null === $this->Racks || $force_update ) {
 			$this->Racks = array();
 			if ( ! empty( $this->get_raw_racks() ) ) {
 				foreach ( $this->get_raw_racks() as $index => $raw_rack ) {
@@ -288,18 +427,23 @@ class Settings extends Abstract_Model
 		}
 		return $this->Racks;
 	}
+
+	public function get_rack_names()
+	{
+		return $this->get_collection_column( $this->get_raw_racks(), 'name' );
+	}
 	
 	public function get_raw_operations()
 	{
 		if ( null === $this->raw_operations ) {
-			$this->raw_operations = $this->get_meta( 'operations' );
+			$this->raw_operations = $this->get_collection_meta( 'operations' );
 		}
 		return $this->raw_operations;
 	}
 
 	public function get_Operations( $force_update = false )
 	{
-		if ( null === $this->Operations ) {
+		if ( null === $this->Operations || $force_update ) {
 			$this->Operations = array();
 			if ( ! empty( $this->get_raw_operations() ) ) {
 				foreach ( $this->get_raw_operations() as $index => $raw_operation ) {
@@ -309,10 +453,21 @@ class Settings extends Abstract_Model
 		}
 		return $this->Operations;
 	}
-	
+
+	public function get_operation_names()
+	{
+		return $this->get_collection_column( $this->get_raw_operations(), 'operation' );
+	}
+
+	public function get_operations_config()
+	{
+		return $this->normalize_snapshot_rows( $this->get_raw_operations() );
+	}
+
 	public function get_Post_Operations()
 	{
 		if ( null === $this->Post_Operations ) {
+			$this->Post_Operations = array();
 			$post_operations = array_filter( $this->get_Operations(), function( $Operation ) {
 				return $Operation->get_type() == 'Post';
 			} );
@@ -324,6 +479,8 @@ class Settings extends Abstract_Model
 						return $Operation->get_operation() == $item['operation'];
 					} ) );
 				}
+			} else {
+				$this->Post_Operations = array_values( $post_operations );
 			}
 		}
 		return $this->Post_Operations;
@@ -333,18 +490,31 @@ class Settings extends Abstract_Model
 	{
 		return $this->get_prop( 'post_ops_order' );
 	}
+
+	public function get_raw_recipes()
+	{
+		if ( null === $this->raw_recipes ) {
+			$this->raw_recipes = $this->get_collection_meta( 'recipes' );
+		}
+		return $this->raw_recipes;
+	}
+
+	public function get_recipes_by_base_metal( $base_metal )
+	{
+		return $this->filter_collection_rows( array( 'base_metal' => $base_metal ), $this->get_raw_recipes() );
+	}
 	
 	public function get_raw_fees()
 	{
 		if ( null === $this->raw_fees ) {
-			$this->raw_fees = $this->get_meta( 'fees' );
+			$this->raw_fees = $this->get_collection_meta( 'fees' );
 		}
 		return $this->raw_fees;
 	}
 
 	public function get_Fees( $force_update = false )
 	{
-		if ( null === $this->Fees ) {
+		if ( null === $this->Fees || $force_update ) {
 			$this->Fees = array();
 			if ( ! empty( $this->get_raw_fees() ) ) {
 				foreach ( $this->get_raw_fees() as $index => $raw_fee ) {
@@ -353,6 +523,125 @@ class Settings extends Abstract_Model
 			}
 		}
 		return $this->Fees;
+	}
+
+	public function get_email_template_names()
+	{
+		return $this->get_collection_column( $this->get_raw_email_templates(), 'name' );
+	}
+
+	public function get_email_templates_config()
+	{
+		return $this->normalize_snapshot_rows( $this->get_raw_email_templates() );
+	}
+
+	public function get_available_plating_metal_rows()
+	{
+		return $this->filter_collection_rows( array( 'hide' => 0 ), $this->get_raw_plating_metals() );
+	}
+
+	public function get_pricing_defaults_snapshot()
+	{
+		return array(
+			'hourly_rate' => $this->get_hourly_rate(),
+			'default_margin' => $this->get_default_margin(),
+			'default_eff' => $this->get_default_eff(),
+			'default_people' => $this->get_default_people(),
+			'default_eau' => $this->get_default_eau(),
+			'default_shift' => $this->get_default_shift(),
+			'default_break_in' => $this->get_default_break_in(),
+			'default_metal_adder' => $this->get_default_metal_adder(),
+			'default_pricing_mode' => $this->get_default_pricing_mode(),
+		);
+	}
+
+	public function get_quote_defaults_snapshot()
+	{
+		return array(
+			'starting_quote_number' => $this->get_starting_quote_number(),
+			'quote_expires_after' => $this->get_quote_expires_after(),
+			'follow_up_after' => $this->get_follow_up_after(),
+		);
+	}
+
+	public function get_quote_content_snapshot()
+	{
+		return array(
+			'quote_header' => $this->get_quote_header(),
+			'quote_footer' => $this->get_quote_footer(),
+			'quote_terms' => $this->get_quote_terms(),
+		);
+	}
+
+	public function get_pdf_snapshot()
+	{
+		return array(
+			'quote_form_id' => $this->get_quote_form_id(),
+			'quote_pdf_id' => $this->get_quote_pdf_id(),
+			'routing_pdf_id' => $this->get_routing_pdf_id(),
+			'quote_pdf_layout' => $this->get_quote_pdf_layout(),
+			'routing_pdf_layout' => $this->get_routing_pdf_layout(),
+		);
+	}
+
+	public function get_access_snapshot()
+	{
+		return array(
+			'domain_whitelist' => $this->get_domain_whitelist_entries(),
+			'email_whitelist' => $this->get_email_whitelist_entries(),
+		);
+	}
+
+	public function get_pricing_reference_snapshot()
+	{
+		return array(
+			'metals' => $this->normalize_snapshot_rows( $this->get_raw_metals() ),
+			'plating_metals' => $this->normalize_snapshot_rows( $this->get_raw_plating_metals() ),
+			'lines' => $this->normalize_snapshot_rows( $this->get_raw_lines() ),
+			'barrels' => $this->normalize_snapshot_rows( $this->get_raw_barrels() ),
+			'racks' => $this->normalize_snapshot_rows( $this->get_raw_racks() ),
+			'operations' => $this->normalize_snapshot_rows( $this->get_raw_operations() ),
+			'recipes' => $this->normalize_snapshot_rows( $this->get_raw_recipes() ),
+			'fees' => $this->normalize_snapshot_rows( $this->get_raw_fees() ),
+		);
+	}
+
+	public function get_quote_snapshot_export()
+	{
+		$snapshot = array(
+			'captured_at' => function_exists( 'current_time' ) ? current_time( 'mysql' ) : gmdate( 'Y-m-d H:i:s' ),
+			'plugin_version' => defined( 'PC_CPQ_VERSION' ) ? PC_CPQ_VERSION : null,
+			'pricing_defaults' => $this->get_pricing_defaults_snapshot(),
+			'quote_defaults' => $this->get_quote_defaults_snapshot(),
+			'quote_content' => $this->get_quote_content_snapshot(),
+			'pdf' => $this->get_pdf_snapshot(),
+			'access' => $this->get_access_snapshot(),
+			'pricing_reference' => $this->get_pricing_reference_snapshot(),
+		);
+
+		$snapshot['fingerprint'] = md5( wp_json_encode( $snapshot ) );
+
+		return $snapshot;
+	}
+
+	public function is_integration_enabled( $integration )
+	{
+		return in_array( sanitize_key( $integration ), $this->get_enabled_integrations(), true );
+	}
+
+	public function is_nutshell_enabled()
+	{
+		return $this->is_integration_enabled( 'nutshell' );
+	}
+
+	public function has_nutshell_credentials()
+	{
+		return '' !== $this->get_nutshell_api_user() && '' !== $this->get_nutshell_api_key();
+	}
+
+	public function is_nutshell_configured()
+	{
+		return $this->is_nutshell_enabled() && $this->has_nutshell_credentials();
 	}
 	
 	/*
@@ -398,6 +687,36 @@ class Settings extends Abstract_Model
 	{
 		return $this->set_prop( 'default_metal_adder', $value );
 	}
+
+	public function set_default_pricing_mode( $value )
+	{
+		return $this->set_prop( 'default_pricing_mode', Pricing_Calculator::sanitize_mode( (string) $value ) );
+	}
+
+	public function set_onboarding_completed_at( $value )
+	{
+		return $this->set_prop( 'onboarding_completed_at', $value );
+	}
+
+	public function set_enabled_integrations( $value )
+	{
+		return $this->set_prop( 'enabled_integrations', is_array( $value ) ? array_values( array_filter( array_map( 'sanitize_key', $value ) ) ) : array() );
+	}
+
+	public function set_nutshell_account_name( $value )
+	{
+		return $this->set_prop( 'nutshell_account_name', $value );
+	}
+
+	public function set_nutshell_api_user( $value )
+	{
+		return $this->set_prop( 'nutshell_api_user', $value );
+	}
+
+	public function set_nutshell_api_key( $value )
+	{
+		return $this->set_prop( 'nutshell_api_key', $value );
+	}
 	
 	public function set_starting_quote_number( $value )
 	{
@@ -438,6 +757,48 @@ class Settings extends Abstract_Model
 	{
 		return $this->set_prop( 'quote_terms', $value );
 	}
+
+	public function set_quote_form_id( $value )
+	{
+		return $this->set_prop( 'quote_form_id', absint( $value ) );
+	}
+
+	public function set_quote_pdf_id( $value )
+	{
+		return $this->set_prop( 'quote_pdf_id', trim( (string) $value ) );
+	}
+
+	public function set_routing_pdf_id( $value )
+	{
+		return $this->set_prop( 'routing_pdf_id', trim( (string) $value ) );
+	}
+
+	public function set_quote_pdf_layout( $value )
+	{
+		$value = sanitize_key( (string) $value );
+		return $this->set_prop( 'quote_pdf_layout', in_array( $value, array( 'standard', 'compact' ), true ) ? $value : 'standard' );
+	}
+
+	public function set_routing_pdf_layout( $value )
+	{
+		$value = sanitize_key( (string) $value );
+		return $this->set_prop( 'routing_pdf_layout', in_array( $value, array( 'standard', 'compact' ), true ) ? $value : 'standard' );
+	}
+
+	public function set_custom_site_head( $value )
+	{
+		return $this->set_prop( 'custom_site_head', $value );
+	}
+
+	public function set_custom_site_css( $value )
+	{
+		return $this->set_prop( 'custom_site_css', $value );
+	}
+
+	public function set_custom_site_body( $value )
+	{
+		return $this->set_prop( 'custom_site_body', $value );
+	}
 	
 	public function set_raw_email_templates( $value )
 	{
@@ -473,6 +834,11 @@ class Settings extends Abstract_Model
 	{
 		return $this->set_prop( 'raw_operations', $value );
 	}
+
+	public function set_raw_recipes( $value )
+	{
+		return $this->set_prop( 'raw_recipes', $value );
+	}
 	
 	public function set_raw_fees( $value )
 	{
@@ -490,9 +856,7 @@ class Settings extends Abstract_Model
 	
 	public function save_raw_email_templates_meta( $value )
 	{
-		$result = update_field( 'email_templates', $value, 'option' );
-		$this->refresh_Email_Templates();
-		return $result;
+		return $this->save_raw_collection_meta( 'email_templates', $value, 'refresh_Email_Templates' );
 	}
 
 	public function save_Email_Templates()
@@ -506,9 +870,7 @@ class Settings extends Abstract_Model
 	
 	public function save_raw_metals_meta( $value )
 	{
-		$result = update_field( 'metals', $value, 'option' );
-		$this->refresh_Metals();
-		return $result;
+		return $this->save_raw_collection_meta( 'metals', $value, 'refresh_Metals' );
 	}
 
 	public function save_Metals()
@@ -522,9 +884,7 @@ class Settings extends Abstract_Model
 	
 	public function save_raw_plating_metals_meta( $value )
 	{
-		$result = update_field( 'plating_metals', $value, 'option' );
-		$this->refresh_Plating_Metals();
-		return $result;
+		return $this->save_raw_collection_meta( 'plating_metals', $value, 'refresh_Plating_Metals' );
 	}
 
 	public function save_Plating_Metals()
@@ -538,9 +898,7 @@ class Settings extends Abstract_Model
 	
 	public function save_raw_lines_meta( $value )
 	{
-		$result = update_field( 'lines', $value, 'option' );
-		$this->refresh_Lines();
-		return $result;
+		return $this->save_raw_collection_meta( 'lines', $value, 'refresh_Lines' );
 	}
 
 	public function save_Lines()
@@ -554,9 +912,7 @@ class Settings extends Abstract_Model
 	
 	public function save_raw_barrels_meta( $value )
 	{
-		$result = update_field( 'barrells', $value, 'option' );
-		$this->refresh_Barrels();
-		return $result;
+		return $this->save_raw_collection_meta( 'barrels', $value, 'refresh_Barrels' );
 	}
 
 	public function save_Barrels()
@@ -570,9 +926,7 @@ class Settings extends Abstract_Model
 	
 	public function save_raw_racks_meta( $value )
 	{
-		$result = update_field( 'racks', $value, 'option' );
-		$this->refresh_Racks();
-		return $result;
+		return $this->save_raw_collection_meta( 'racks', $value, 'refresh_Racks' );
 	}
 
 	public function save_Racks()
@@ -586,9 +940,12 @@ class Settings extends Abstract_Model
 	
 	public function save_raw_operations_meta( $value )
 	{
-		$result = update_field( 'operations', $value, 'option' );
-		$this->refresh_Operations();
-		return $result;
+		return $this->save_raw_collection_meta( 'operations', $value, 'refresh_Operations' );
+	}
+
+	public function save_raw_recipes_meta( $value )
+	{
+		return $this->save_raw_collection_meta( 'recipes', $value, 'refresh_raw_recipes' );
 	}
 
 	public function save_Operations()
@@ -602,9 +959,7 @@ class Settings extends Abstract_Model
 	
 	public function save_raw_fees_meta( $value )
 	{
-		$result = update_field( 'fees', $value, 'option' );
-		$this->refresh_Fees();
-		return $result;
+		return $this->save_raw_collection_meta( 'fees', $value, 'refresh_Fees' );
 	}
 
 	public function save_Fees()
@@ -650,7 +1005,9 @@ class Settings extends Abstract_Model
 	
 	public function refresh_Email_Templates()
 	{
-		$this->get_Email_Templates( true );
+		$this->raw_email_templates = null;
+		$this->Email_Templates = null;
+		return $this->get_Email_Templates( true );
 	}
 	
 	public function get_Metals_count()
@@ -683,7 +1040,9 @@ class Settings extends Abstract_Model
 	
 	public function refresh_Metals()
 	{
-		$this->get_Metals( true );
+		$this->raw_metals = null;
+		$this->Metals = null;
+		return $this->get_Metals( true );
 	}
 	
 	public function get_Plating_Metals_count()
@@ -716,7 +1075,9 @@ class Settings extends Abstract_Model
 	
 	public function refresh_Plating_Metals()
 	{
-		$this->get_Plating_Metals( true );
+		$this->raw_plating_metals = null;
+		$this->Plating_Metals = null;
+		return $this->get_Plating_Metals( true );
 	}
 	
 	public function get_Lines_count()
@@ -749,7 +1110,9 @@ class Settings extends Abstract_Model
 	
 	public function refresh_Lines()
 	{
-		$this->get_Lines( true );
+		$this->raw_lines = null;
+		$this->Lines = null;
+		return $this->get_Lines( true );
 	}
 	
 	public function get_Barrels_count()
@@ -782,7 +1145,9 @@ class Settings extends Abstract_Model
 	
 	public function refresh_Barrels()
 	{
-		$this->get_Barrels( true );
+		$this->raw_barrels = null;
+		$this->Barrels = null;
+		return $this->get_Barrels( true );
 	}
 	
 	public function get_Racks_count()
@@ -815,7 +1180,9 @@ class Settings extends Abstract_Model
 	
 	public function refresh_Racks()
 	{
-		$this->get_Racks( true );
+		$this->raw_racks = null;
+		$this->Racks = null;
+		return $this->get_Racks( true );
 	}
 	
 	public function get_Operations_count()
@@ -848,7 +1215,10 @@ class Settings extends Abstract_Model
 	
 	public function refresh_Operations()
 	{
-		$this->get_Operations( true );
+		$this->raw_operations = null;
+		$this->Operations = null;
+		$this->Post_Operations = null;
+		return $this->get_Operations( true );
 	}
 	
 	public function get_Fees_count()
@@ -881,7 +1251,302 @@ class Settings extends Abstract_Model
 	
 	public function refresh_Fees()
 	{
-		$this->get_Fees( true );
+		$this->raw_fees = null;
+		$this->Fees = null;
+		return $this->get_Fees( true );
+	}
+
+	public function refresh_raw_recipes()
+	{
+		$this->raw_recipes = null;
+		return $this->get_raw_recipes();
+	}
+
+	public function get_collection_column( $rows = null, $column = 'name' )
+	{
+		$rows = is_array( $rows ) ? $rows : array();
+		return wp_list_pluck( $rows, $column );
+	}
+
+	public function filter_collection_rows( array $args, $rows = null, $operator = 'AND' )
+	{
+		$rows = is_array( $rows ) ? $rows : array();
+		return array_values( wp_list_filter( $rows, $args, $operator ) );
+	}
+
+	public function find_collection_row( $value, $rows = null, $key = 'name' )
+	{
+		$rows = is_array( $rows ) ? $rows : array();
+		$matches = wp_list_filter( $rows, [ $key => $value ] );
+		return ! empty( $matches ) ? reset( $matches ) : null;
+	}
+
+	public function find_collection_value( $value, $property, $rows = null, $key = 'name' )
+	{
+		$row = $this->find_collection_row( $value, $rows, $key );
+		return is_array( $row ) && array_key_exists( $property, $row ) ? $row[$property] : null;
+	}
+
+	public function find_metal_value( $metal, $property )
+	{
+		return $this->find_collection_value( $metal, $property, $this->get_raw_metals() );
+	}
+
+	public function find_plating_metal( $metal )
+	{
+		return $this->find_collection_row( $metal, $this->get_raw_plating_metals() );
+	}
+
+	public function find_plating_metal_value( $metal, $property )
+	{
+		return $this->find_collection_value( $metal, $property, $this->get_raw_plating_metals() );
+	}
+
+	public function find_line( $line )
+	{
+		return $this->find_collection_row( $line, $this->get_raw_lines() );
+	}
+
+	public function find_line_value( $line, $property )
+	{
+		return $this->find_collection_value( $line, $property, $this->get_raw_lines() );
+	}
+
+	public function find_barrel( $barrel )
+	{
+		return $this->find_collection_row( $barrel, $this->get_raw_barrels() );
+	}
+
+	public function find_rack( $rack )
+	{
+		return $this->find_collection_row( $rack, $this->get_raw_racks() );
+	}
+
+	public function find_operation( $type, $metal )
+	{
+		foreach ( $this->get_Operations() as $Operation ) {
+			if ( $Operation->get_type() !== $type ) {
+				continue;
+			}
+
+			$operation_metal = $Operation->get_metal();
+			if ( is_array( $operation_metal ) ) {
+				if ( in_array( $metal, $operation_metal, true ) ) {
+					return $Operation;
+				}
+				continue;
+			}
+
+			if ( $operation_metal === $metal ) {
+				return $Operation;
+			}
+		}
+
+		return null;
+	}
+
+	public function get_whitelist_entries( $prop )
+	{
+		$value = $this->get_string_prop( $prop );
+		if ( empty( $value ) || ! is_string( $value ) ) {
+			return [];
+		}
+
+		$lines = preg_split( '/\R+/', $value );
+		$lines = array_map( function ( $line ) {
+			return strtolower( trim( $line ) );
+		}, $lines );
+
+		return array_values( array_filter( $lines ) );
+	}
+
+	public function get_domain_whitelist_entries()
+	{
+		return $this->get_whitelist_entries( 'domain_whitelist' );
+	}
+
+	public function get_email_whitelist_entries()
+	{
+		return $this->get_whitelist_entries( 'email_whitelist' );
+	}
+
+	public function is_onboarding_complete()
+	{
+		return '' !== $this->get_onboarding_completed_at();
+	}
+
+	public function complete_onboarding()
+	{
+		$value = function_exists( 'current_time' ) ? current_time( 'mysql' ) : gmdate( 'Y-m-d H:i:s' );
+		$this->update_prop( 'onboarding_completed_at', $value );
+		return $value;
+	}
+
+	public function reopen_onboarding()
+	{
+		$this->update_prop( 'onboarding_completed_at', '' );
+		return '';
+	}
+
+	public function get_onboarding_checklist()
+	{
+		$price_complete = $this->get_hourly_rate() > 0
+			&& $this->get_default_margin() > 0
+			&& $this->get_default_eff() > 0
+			&& $this->get_default_people() > 0
+			&& $this->get_default_shift() > 0;
+
+		$quote_complete = '' !== $this->get_starting_quote_number()
+			&& $this->get_quote_expires_after() > 0
+			&& $this->get_follow_up_after() > 0;
+
+		$plating_complete = ! empty( $this->get_raw_metals() )
+			&& ! empty( $this->get_raw_plating_metals() )
+			&& ! empty( $this->get_raw_lines() )
+			&& ( ! empty( $this->get_raw_barrels() ) || ! empty( $this->get_raw_racks() ) );
+
+		$process_complete = ! empty( $this->get_raw_operations() );
+
+		$template_complete = '' !== $this->get_quote_header()
+			&& '' !== $this->get_quote_footer()
+			&& '' !== $this->get_quote_terms();
+
+		return array(
+			array(
+				'slug' => 'price',
+				'title' => 'Price Settings',
+				'description' => 'Set your default pricing mode and baseline labor, margin, and efficiency inputs.',
+				'complete' => $price_complete,
+				'url' => PC_CPQ()->Site()->get_settings_page_url( 'price' ),
+			),
+			array(
+				'slug' => 'quotes',
+				'title' => 'Quote Settings',
+				'description' => 'Set quote numbering, expiration, and follow-up defaults.',
+				'complete' => $quote_complete,
+				'url' => PC_CPQ()->Site()->get_settings_page_url( 'quotes' ),
+			),
+			array(
+				'slug' => 'plating',
+				'title' => 'Plating Settings',
+				'description' => 'Load the metals, plating metals, lines, and tooling data needed for quoting.',
+				'complete' => $plating_complete,
+				'url' => PC_CPQ()->Site()->get_settings_page_url( 'plating' ),
+			),
+			array(
+				'slug' => 'processes',
+				'title' => 'Process Settings',
+				'description' => 'Configure the routing and operation records used to calculate work content.',
+				'complete' => $process_complete,
+				'url' => PC_CPQ()->Site()->get_settings_page_url( 'processes' ),
+			),
+			array(
+				'slug' => 'templates',
+				'title' => 'Templates',
+				'description' => 'Review the quote header, footer, terms, and any email templates you plan to use.',
+				'complete' => $template_complete,
+				'url' => PC_CPQ()->Site()->get_settings_page_url( 'templates' ),
+			),
+		);
+	}
+
+	public function can_complete_onboarding()
+	{
+		return true;
+	}
+
+	public function is_whitelisted( $email )
+	{
+		$email = strtolower( trim( (string) $email ) );
+		if ( ! filter_var( $email, FILTER_VALIDATE_EMAIL ) ) {
+			return 'No';
+		}
+
+		if ( in_array( $email, $this->get_email_whitelist_entries(), true ) ) {
+			return 'Yes';
+		}
+
+		$email_parts = explode( '@', $email );
+		$domain = array_pop( $email_parts );
+
+		return in_array( $domain, $this->get_domain_whitelist_entries(), true ) ? 'Yes' : 'No';
+	}
+
+	protected function save_option_field( $prop, $value )
+	{
+		if ( function_exists( 'update_field' ) ) {
+			return update_field( $prop, $value, 'option' );
+		}
+
+		return update_option( 'setting_' . $prop, $value );
+	}
+
+	protected function get_collection_meta( $prop )
+	{
+		$value = $this->get_meta( $prop );
+		return is_array( $value ) ? $value : array();
+	}
+
+	protected function normalize_snapshot_rows( $rows )
+	{
+		if ( empty( $rows ) || ! is_array( $rows ) ) {
+			return array();
+		}
+
+		return array_values( array_map( function ( $row ) {
+			return is_array( $row ) ? $row : (array) $row;
+		}, $rows ) );
+	}
+
+	protected function get_string_prop( $prop, $default = '' )
+	{
+		$value = $this->get_prop( $prop );
+		if ( null === $value || false === $value ) {
+			return $default;
+		}
+
+		return is_string( $value ) ? trim( $value ) : (string) $value;
+	}
+
+	protected function get_float_prop( $prop, $default = 0.0 )
+	{
+		$value = $this->get_prop( $prop );
+		if ( '' === $value || null === $value || false === $value ) {
+			return $default;
+		}
+
+		return floatval( $value );
+	}
+
+	protected function get_int_prop( $prop, $default = 0 )
+	{
+		$value = $this->get_prop( $prop );
+		if ( '' === $value || null === $value || false === $value ) {
+			return $default;
+		}
+
+		return absint( $value );
+	}
+
+	protected function get_digit_string_prop( $prop, $default = '' )
+	{
+		$value = $this->get_string_prop( $prop, $default );
+		if ( '' === $value ) {
+			return $default;
+		}
+
+		return preg_replace( '/\D+/', '', $value );
+	}
+
+	protected function save_raw_collection_meta( $prop, $value, $refresh_method )
+	{
+		$result = $this->save_option_field( $prop, $value );
+
+		if ( is_callable( array( $this, $refresh_method ) ) ) {
+			$this->{$refresh_method}();
+		}
+
+		return $result;
 	}
 
 	public function get_hidden()
@@ -894,9 +1559,9 @@ class Settings extends Abstract_Model
 	{
 		if ( function_exists( 'get_field' ) ) {
 			return get_field( $prop, 'option' );
-		} else {
-			return get_option( 'setting_' . $prop );
 		}
+
+		return get_option( 'setting_' . $prop );
 	}
 
 	protected function set_prop( $prop, $value )
@@ -928,7 +1593,7 @@ class Settings extends Abstract_Model
 			if ( function_exists( 'update_field' ) ) {
 				update_field( $prop, $value, 'option' );
 			} else {
-				update_post_meta( $this->get_id(), 'setting_' . $prop, $value );
+				update_option( 'setting_' . $prop, $value );
 			}
 		}
 	}
