@@ -4,7 +4,7 @@
  * Plugin Name: PolyCoat CPQ
  * Plugin URI: https://polycoatcpq.com/
  * Description: PolyCoat Configure, Price, Quote Tool
- * Version: 2.0.0
+ * Version: 2.1.0
  * Author: The Snowberry Team
  * Author URI: https://snowberrymedia.com/
  *
@@ -23,7 +23,7 @@ final class PC_CPQ
 	/**
 	 * @var string
 	 */
-	public $version = '2.0.0';
+	public $version = '2.1.0';
 
 	/**
 	 * @var string
