@@ -532,6 +532,7 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 				case 'operation':
 					var type = row.find( 'select[name="raw_operations/' + index + '/type"]' ).val();
 					var baseMetal = row.find( 'select[name="raw_operations/' + index + '/base_metal"]' ).val();
+					var platingMethod = row.find( 'select[name="raw_operations/' + index + '/plating_method"]' ).val();
 					var material = row.find( 'select[name="raw_operations/' + index + '/material"]' ).val();
 					data = {
 						operation: row.find( 'input[name="raw_operations/' + index + '/operation"]' ).val(),
@@ -542,7 +543,7 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 						cycleUnit: row.find( 'input[name="raw_operations/' + index + '/cycle_unit"]' ).val(),
 						efficiency: row.find( 'input[name="raw_operations/' + index + '/efficiency"]' ).val(),
 						type: type,
-						metalMaterial: type == 'Prep' ? baseMetal : material
+						metalMaterial: type == 'Prep' ? baseMetal + ( platingMethod ? ' (' + platingMethod + ')' : '' ) : material
 					};
 					break;
 				case 'fee':
@@ -716,6 +717,7 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 			$( document ).on( 'click', '.js-requote', $.proxy( this.requote, this ) );
 			$( document ).on( 'submit', '.js-edit-lead-form', $.proxy( this.editLead, this ) );
 			$( document ).on( 'click', '.js-delete-lead', $.proxy( this.deleteLead, this ) );
+			$( document ).on( 'click', '.js-clone-lead', $.proxy( this.cloneLead, this ) );
 			$( document ).on( 'click', '.js-add-part', $.proxy( this.addPart, this ) );
 			$( document ).on( 'click', '.js-clone-part', $.proxy( this.clonePart, this ) );
 			$( document ).on( 'click', '.js-copy-part-process', $.proxy( this.copyPartProcess, this ) );
@@ -743,6 +745,7 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 
 			$( document ).on( 'click', '.js-save-customer', $.proxy( this.saveCustomer, this ) );
 			$( document ).on( 'change', 'select[name^="raw_parts/"][name$="/metal"]', $.proxy( this.updateProcessMetalData, this ) );
+			$( document ).on( 'change input', 'select[name^="raw_parts/"][name*="/processes/"], input[name^="raw_parts/"][name*="/processes/"][name$="/min_thickness"], input[name^="raw_parts/"][name*="/processes/"][name$="/max_thickness"], input[name^="raw_parts/"][name*="/processes/"][name$="/deposition_rate_override"]', $.proxy( this.queueRefreshPartProcessViews, this ) );
 			$( document ).on( 'shown.bs.collapse', 'tr.collapse[id^="manage-part-details-"]', $.proxy( this.onPartDetailsOpened, this ) );
 			$( document ).on( 'click', '.js-open-file-preview', $.proxy( this.openFilePreview, this ) );
 			$( document ).on( 'click', '.js-file-preview-zoom-in', $.proxy( this.zoomFilePreviewIn, this ) );
@@ -962,6 +965,29 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 			}
 		},
 
+		cloneLead( e ) {
+			if ( confirm( 'Create a new lead by copying this one?' ) !== true ) {
+				return;
+			}
+
+			const ID = $( e.currentTarget ).data( 'id' );
+			const data = {
+				action: 'clone_lead',
+				lead_id: ID
+			};
+
+			PC_CPQ_Manage.Form.fetch( data, ( ( response ) => {
+				if ( ! response?.success ) {
+					PC_CPQ_Manage.Form.showActionError( response?.data?.message || 'That lead could not be cloned.' );
+					return;
+				}
+
+				if ( response?.data?.url ) {
+					window.location.href = response.data.url;
+				}
+			} ) );
+		},
+
 		addPart() {
 			const liveData = this.getLiveParts();
 			const data = {
@@ -1089,6 +1115,48 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 			$row.attr( 'data-metal', value );
 			$detail.attr( 'data-metal', value );
 			$row.find( '[data-model="metal"]' ).text( value );
+		},
+
+		queueRefreshPartProcessViews( e ) {
+			const $input = $( e.currentTarget );
+			const matches = $input.attr( 'name' ).match( /raw_parts\/(\d+)\/processes\/(\d+)\// );
+			if ( ! matches ) {
+				return;
+			}
+
+			const partIndex = parseInt( matches[1], 10 );
+			const processIndex = parseInt( matches[2], 10 );
+			clearTimeout( this.refreshPartProcessViewsTimer );
+			this.refreshPartProcessViewsTimer = setTimeout( () => {
+				this.refreshPartProcessViews( partIndex, processIndex );
+			}, 250 );
+		},
+
+		refreshPartProcessViews( partIndex, processIndex = null ) {
+			const liveData = this.getLivePartProcesses( partIndex );
+			const openDetailIds = $( '#part_' + partIndex + '_processes .js-process-detail-row.show' ).map( ( i, el ) => $( el ).attr( 'id' ) ).get();
+			const data = {
+				action: 'refresh_part_process_views',
+				lead_id: this.leadID,
+				part_id: partIndex,
+				live_part_processes: liveData
+			};
+
+			PC_CPQ_Manage.Form.fetch( data, ( ( response ) => {
+				$( '#part_' + response.data.i + '_processes' ).html( response.data.processesHtml );
+				$( '#part_' + response.data.i + '_plating' ).html( response.data.operationsHtml );
+				this.initProcessSortable();
+				this.initOperationSortable();
+				this.initPlatingToolInputs();
+
+				openDetailIds.forEach( ( id ) => {
+					$( '#' + id ).addClass( 'show' );
+				} );
+
+				if ( processIndex !== null ) {
+					$( '#manage-part-' + response.data.i + '-process-details-' + processIndex ).addClass( 'show' );
+				}
+			} ) );
 		},
 
 		getCopiedProcess( forceUpdate = false ) {
@@ -2710,13 +2778,17 @@ var PC_CPQ_Manage = ( function ( PC_CPQ_Manage, $, Pace ) {
 				return false;
 			}
 
-			$select.closest( '.card-body' ).find( 'select[name*="/base_metal"],select[name*="/material"]' ).closest( '.form-group' ).addClass( 'd-none' );
-			if ( type == 'Prep' ) {
+			$select.closest( '.card-body' ).find( 'select[name*="/base_metal"],select[name*="/material"],select[name*="/plating_method"]' ).closest( '.form-group' ).addClass( 'd-none' );
+			if ( type == 'Pre' || type == 'Prep' ) {
 				$select.closest( '.card-body' ).find( 'select[name$="/base_metal"]' ).closest( '.form-group' ).removeClass( 'd-none' );
 			}
 
-			if ( type == 'Plating' ) {
+			if ( type == 'Plating' || type == 'Post' ) {
 				$select.closest( '.card-body' ).find( 'select[name$="/material"]' ).closest( '.form-group' ).removeClass( 'd-none' );
+			}
+
+			if ( type == 'Plating' ) {
+				$select.closest( '.card-body' ).find( 'select[name$="/plating_method"]' ).closest( '.form-group' ).removeClass( 'd-none' );
 			}
 		},
 

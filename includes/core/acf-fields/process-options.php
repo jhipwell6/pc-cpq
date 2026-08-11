@@ -190,7 +190,7 @@ if ( function_exists( 'acf_add_local_field_group' ) ):
 						'name' => 'type',
 						'type' => 'select',
 						'instructions' => '',
-						'required' => 0,
+						'required' => 1,
 						'conditional_logic' => 0,
 						'wrapper' => array(
 							'width' => '',
@@ -199,6 +199,7 @@ if ( function_exists( 'acf_add_local_field_group' ) ):
 						),
 						'choices' => array(
 							'null' => 'Select a type',
+							'Pre' => 'Pre',
 							'Prep' => 'Prep',
 							'Plating' => 'Plating',
 							'Post' => 'Post',
@@ -219,6 +220,13 @@ if ( function_exists( 'acf_add_local_field_group' ) ):
 						'instructions' => '',
 						'required' => 0,
 						'conditional_logic' => array(
+							array(
+								array(
+									'field' => 'field_641079a561f69',
+									'operator' => '==',
+									'value' => 'Pre',
+								),
+							),
 							array(
 								array(
 									'field' => 'field_641079a561f69',
@@ -244,9 +252,9 @@ if ( function_exists( 'acf_add_local_field_group' ) ):
 						'placeholder' => '',
 					),
 					array(
-						'key' => 'field_63e25e6fe9fbe',
-						'label' => 'Material',
-						'name' => 'material',
+						'key' => 'field_689a1d1f4b8f1',
+						'label' => 'Plating Method',
+						'name' => 'plating_method',
 						'type' => 'select',
 						'instructions' => '',
 						'required' => 0,
@@ -265,10 +273,52 @@ if ( function_exists( 'acf_add_local_field_group' ) ):
 							'id' => '',
 						),
 						'choices' => array(
+							'' => 'Any method',
+							'Barrel' => 'Barrel',
+							'Rack' => 'Rack',
 						),
-						'default_value' => false,
+						'default_value' => '',
 						'allow_null' => 0,
 						'multiple' => 0,
+						'ui' => 0,
+						'return_format' => 'value',
+						'ajax' => 0,
+						'placeholder' => '',
+					),
+					array(
+						'key' => 'field_63e25e6fe9fbe',
+						'label' => 'Material',
+						'name' => 'material',
+						'type' => 'select',
+						'instructions' => '',
+						'required' => 0,
+						'conditional_logic' => array(
+							array(
+								array(
+									'field' => 'field_641079a561f69',
+									'operator' => '==',
+									'value' => 'Plating',
+								),
+							),
+							array(
+								array(
+									'field' => 'field_641079a561f69',
+									'operator' => '==',
+									'value' => 'Post',
+								),
+							),
+						),
+						'wrapper' => array(
+							'width' => '',
+							'class' => '',
+							'id' => '',
+						),
+						'choices' => array(
+						),
+						'default_value' => array(
+						),
+						'allow_null' => 0,
+						'multiple' => 1,
 						'ui' => 0,
 						'return_format' => 'value',
 						'ajax' => 0,

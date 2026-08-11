@@ -16,6 +16,7 @@ class Part_Process extends Repeater_Model
 	protected $min_thickness;
 	protected $max_thickness;
 	protected $unit;
+	protected $deposition_rate_override;
 	// computed
 	private $average_thickness;
 	private $metal_deposit_rate;
@@ -63,6 +64,12 @@ class Part_Process extends Repeater_Model
 		return $this->get_prop( 'unit' );
 	}
 
+	public function get_deposition_rate_override()
+	{
+		$value = $this->get_prop( 'deposition_rate_override' );
+		return '' !== $value && false !== $value ? floatval( $value ) : '';
+	}
+
 	/*
 	 * Getters (computed)
 	 */
@@ -86,7 +93,12 @@ class Part_Process extends Repeater_Model
 	public function get_metal_deposit_rate()
 	{
 		if ( null === $this->metal_deposit_rate ) {
-			$this->metal_deposit_rate = floatval( PC_CPQ()->Settings()->find_plating_metal_value( $this->get_metal(), 'deposit_rate' ) );
+			$override = $this->get_deposition_rate_override();
+			if ( '' !== $override && $override >= 0 ) {
+				$this->metal_deposit_rate = floatval( $override );
+			} else {
+				$this->metal_deposit_rate = floatval( PC_CPQ()->Settings()->find_plating_metal_value( $this->get_metal(), 'deposit_rate' ) );
+			}
 		}
 		return $this->metal_deposit_rate;
 	}

@@ -34,30 +34,12 @@
 								</datalist>
 								<?php endif; ?>
 							</div>
-							<?php
-								$selected_fees = wp_list_pluck( (array) $Lead->get_fees(), 'fee' );
-								$has_saved_fees = ! empty( $selected_fees );
-							?>
-							<?php if ( ! empty( PC_CPQ()->Settings()->get_Fees() ) ) : ?>
-							<div class="form-group">
-								<label class="form-label d-block">Fees</label>
-								<?php $i = 0; foreach ( PC_CPQ()->Settings()->get_Fees() as $Fee ) : ?>
-								<?php
-									$is_checked = $has_saved_fees ? in_array( $Fee->get_name(), $selected_fees, true ) : $Fee->is_enabled_by_default();
-									$formatted_amount = $Fee->get_unit() == 'percent'
-										? $Fee->get_amount() . '%'
-										: '$' . $Fee->get_amount();
-								?>
-								<div class="custom-control custom-checkbox">
-									<input type="checkbox" class="custom-control-input" id="fees_<?php echo $i; ?>" name="selected_fees/<?php echo $i; ?>" value="<?php echo esc_attr( $Fee->get_name() ); ?>"<?php checked( $is_checked ); ?>>
-									<label class="custom-control-label" for="fees_<?php echo $i; ?>">
-										<?php echo $Fee->get_name(); ?>
-										<small class="text-muted">(<?php echo esc_html( $formatted_amount ); ?>)</small>
-									</label>
-								</div>
-								<?php $i++; endforeach; ?>
-							</div>
-							<?php endif; ?>
+							<?php echo PC_CPQ()->view( 'manage/partials/fee-options', array(
+								'Lead' => $Lead,
+								'input_name_prefix' => 'selected_fees',
+								'field_label' => 'Fees',
+								'input_id_prefix' => 'quote_fees',
+							) ); ?>
 							<?php wp_nonce_field( 'send_quote', 'send_quote_nonce' ); ?>
 							<?php wp_nonce_field( 'preview_quote', 'preview_quote_nonce' ); ?>
 							<input type="submit" value="Send Quote" class="btn btn-success float-right js-send-quote" />

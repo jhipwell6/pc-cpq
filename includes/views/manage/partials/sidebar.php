@@ -71,18 +71,6 @@ $is_settings = $Site->is_manage_settings();
 								<p>Quote Settings</p>
 							</a>
 						</li>
-						<li class="nav-item" id="nav-item_settings_integrations">
-							<a href="<?php echo $Site->get_settings_page_url( 'integrations' ); ?>" class="nav-link<?php echo 'integrations' === $current_page_slug ? ' active' : ''; ?>">
-								<i class="fas fa-chevron-right nav-icon text-xs"></i>
-								<p>Integrations</p>
-							</a>
-						</li>
-						<li class="nav-item" id="nav-item_settings_users">
-							<a href="<?php echo $Site->get_settings_page_url( 'users' ); ?>" class="nav-link<?php echo 'users' === $current_page_slug ? ' active' : ''; ?>">
-								<i class="fas fa-chevron-right nav-icon text-xs"></i>
-								<p>Users</p>
-							</a>
-						</li>
 						<li class="nav-item" id="nav-item_settings_plating">
 							<a href="<?php echo $Site->get_settings_page_url( 'plating' ); ?>" class="nav-link<?php echo 'plating' === $current_page_slug ? ' active' : ''; ?>">
 								<i class="fas fa-chevron-right nav-icon text-xs"></i>
@@ -105,6 +93,18 @@ $is_settings = $Site->is_manage_settings();
 							<a href="<?php echo $Site->get_settings_page_url( 'templates' ); ?>" class="nav-link<?php echo 'templates' === $current_page_slug ? ' active' : ''; ?>">
 								<i class="fas fa-chevron-right nav-icon text-xs"></i>
 								<p>Templates</p>
+							</a>
+						</li>
+						<li class="nav-item" id="nav-item_settings_integrations">
+							<a href="<?php echo $Site->get_settings_page_url( 'integrations' ); ?>" class="nav-link<?php echo 'integrations' === $current_page_slug ? ' active' : ''; ?>">
+								<i class="fas fa-chevron-right nav-icon text-xs"></i>
+								<p>Integrations</p>
+							</a>
+						</li>
+						<li class="nav-item" id="nav-item_settings_users">
+							<a href="<?php echo $Site->get_settings_page_url( 'users' ); ?>" class="nav-link<?php echo 'users' === $current_page_slug ? ' active' : ''; ?>">
+								<i class="fas fa-chevron-right nav-icon text-xs"></i>
+								<p>Users</p>
 							</a>
 						</li>
 					</ul>

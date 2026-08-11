@@ -12,6 +12,7 @@
 		<tr>
 			<th style="width: 40px"></th>
 			<th style="width: 10px">#</th>
+			<th style="width: 120px">Type</th>
 			<th>Operation</th>
 			<th></th>
 		</tr>
@@ -30,6 +31,7 @@
 					<?php endif; ?>
 				</td>
 				<td style="width: 10px"><?php echo $r + 1; ?>.</td>
+				<td data-model="type"><?php echo $Operation->get_type(); ?></td>
 				<td data-model="metal"><?php echo $Operation->get_operation(); ?></td>
 				<td class="text-right py-0 align-middle">
 					<div class="btn-group btn-group-sm">
@@ -42,6 +44,14 @@
 				<td colspan="5">
 					<div class="part-modal-edit-row p-4 js-part-operation" data-index="<?php echo $r; ?>" data-part-index="<?php echo $i; ?>" data-process-index="<?php echo $is_sortable ? $process_index : ''; ?>">
 						<?php // echo pc_cpq_get_input_html( 'operation', $Operation, [ $i, $r ] ); ?>
+						<div class="form-group row">
+							<label class="col-sm-2 col-form-label">Type</label>
+							<div class="col-sm-10">
+								<div class="input-group">
+									<div class="col-form-label" data-model="operation_type"><?php echo $Operation->get_type(); ?></div>
+								</div>
+							</div>
+						</div>
 						<div class="form-group row">
 							<label class="col-sm-2 col-form-label">Operation</label>
 							<div class="col-sm-10">
@@ -82,6 +92,7 @@
 			<tr data-type="routing" data-index="<?php echo $r; ?>" data-sortable="0">
 				<td></td>
 				<td style="width: 10px"><?php echo $r + 1; ?>.</td>
+				<td data-model="type"><?php echo $Post_Operation->get_type(); ?></td>
 				<td data-model="metal"><?php echo $Post_Operation->get_operation(); ?></td>
 				<td class="text-right py-0 align-middle">
 					

@@ -244,6 +244,7 @@ final class PC_CPQ
 		// frontend
 		include_once $this->plugin_path() . '/includes/controllers/pc-cpq-custom-fields.php';
 		include_once $this->plugin_path() . '/includes/controllers/pc-cpq-forms.php';
+		include_once $this->plugin_path() . '/includes/controllers/pc-cpq-login.php';
 		include_once $this->plugin_path() . '/includes/controllers/pc-cpq-lock.php';
 		include_once $this->plugin_path() . '/includes/controllers/pc-cpq-template.php';
 		

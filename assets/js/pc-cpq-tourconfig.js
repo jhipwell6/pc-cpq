@@ -164,7 +164,7 @@ const getLeadEditSteps = () => ( [
 			on: 'right'
 		},
 		title: 'Lead details',
-		text: 'This card holds the operational context for the quote: status, service, finishing requirements, certification, and internal notes.'
+		text: 'This card holds the operational context for the quote: status, service, finishing requirements, applied fees, and internal notes.'
 	},
 	{
 		id: 'lead-contact-card',

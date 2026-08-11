@@ -15,6 +15,7 @@
 				<th>Efficiency</th>
 				<th>Type</th>
 				<th>Metal/Material</th>
+				<th>Plating Method</th>
 				<th></th>
 			</tr>
 		</thead>
@@ -33,7 +34,8 @@
 				<td data-model="cycleUnit"><?php echo $Operation->get_cycle_unit(); ?></td>
 				<td data-model="efficiency"><?php echo $Operation->get_efficiency(); ?></td>
 				<td data-model="type"><?php echo $Operation->get_type(); ?></td>
-				<td data-model="metalMaterial"><?php echo $Operation->get_type() == 'Prep' ? $Operation->get_base_metal_list() : $Operation->get_material(); ?></td>
+				<td data-model="metalMaterial"><?php echo $Operation->get_type() == 'Prep' ? $Operation->get_prep_match_label() : $Operation->get_material_list(); ?></td>
+				<td data-model="platingMethod"><?php echo $Operation->get_plating_method(); ?></td>
 				<td class="text-right py-0 align-middle">
 					<div class="btn-group btn-group-sm">
 						<button type="button" class="btn btn-primary js-sortable-handle"><i class="fas fa-arrows-alt"></i></button>

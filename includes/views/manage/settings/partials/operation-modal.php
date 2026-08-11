@@ -15,6 +15,7 @@
 					<div class="card-body">
 						<?php echo pc_cpq_get_input_html( 'type', $Operation, $i ); ?>
 						<?php echo pc_cpq_get_input_html( 'base_metal', $Operation, $i ); ?>
+						<?php echo pc_cpq_get_input_html( 'plating_method', $Operation, $i ); ?>
 						<?php echo pc_cpq_get_input_html( 'material', $Operation, $i ); ?>
 						<?php echo pc_cpq_get_input_html( 'operation', $Operation, $i ); ?>
 						<?php echo pc_cpq_get_input_html( 'description', $Operation, $i ); ?>

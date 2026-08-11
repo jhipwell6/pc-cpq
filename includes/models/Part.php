@@ -381,14 +381,46 @@ class Part extends Repeater_Model
 	{
 		// uncached
 		$this->Operations = [];
+		$i = 0;
 		if ( $this->get_base_metal() ) {
-			$this->Operations[] = new self::$Routing_Class( 0, [ 'type' => 'Prep', 'metal' => $this->get_base_metal() ] );
+			$pre_operations = PC_CPQ()->Settings()->find_operations( 'Pre', $this->get_base_metal() );
+
+			if ( ! empty( $pre_operations ) ) {
+				foreach ( $pre_operations as $Pre_Operation ) {
+					$this->Operations[] = new self::$Routing_Class( $i, [
+						'type' => 'Pre',
+						'metal' => $this->get_base_metal(),
+						'matched_operation_id' => $Pre_Operation->get_id(),
+					], $this );
+					$i ++;
+				}
+			}
+
+			$prep_operations = PC_CPQ()->Settings()->find_operations( 'Prep', $this->get_base_metal() );
+
+			if ( ! empty( $prep_operations ) ) {
+				foreach ( $prep_operations as $Prep_Operation ) {
+					$this->Operations[] = new self::$Routing_Class( $i, [
+						'type' => 'Prep',
+						'metal' => $this->get_base_metal(),
+						'matched_operation_id' => $Prep_Operation->get_id(),
+					], $this );
+					$i ++;
+				}
+			} else {
+				$this->Operations[] = new self::$Routing_Class( $i, [ 'type' => 'Prep', 'metal' => $this->get_base_metal() ], $this );
+				$i ++;
+			}
 		}
 
 		if ( ! empty( $this->get_Processes() ) ) {
-			$i = 1;
 			foreach ( $this->get_Processes() as $Process ) {
-				$this->Operations[] = new self::$Routing_Class( $i, [ 'type' => 'Plating', 'metal' => $Process->get_metal() ] );
+				$this->Operations[] = new self::$Routing_Class( $i, [
+					'type' => 'Plating',
+					'metal' => $Process->get_metal(),
+					// Keep plating-tab process rows aligned with the computed process time.
+					'time' => $Process->get_time(),
+				] );
 				$i ++;
 			}
 		}

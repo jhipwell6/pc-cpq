@@ -25,7 +25,6 @@
 						<?php echo pc_cpq_get_input_html( 'industry', $Lead ); ?>
 						<?php echo pc_cpq_get_input_html( 'business', $Lead ); ?>
 						<?php echo pc_cpq_get_input_html( 'stage', $Lead ); ?>
-						<?php echo pc_cpq_get_input_html( 'certification', $Lead ); ?>
 						<?php echo pc_cpq_get_input_html( 'include_metal_factor', $Lead ); ?>
 						<?php echo pc_cpq_get_input_html( 'notes', $Lead ); ?>
 						<?php

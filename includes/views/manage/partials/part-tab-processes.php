@@ -34,6 +34,7 @@
 						echo pc_cpq_get_input_html( 'min_thickness', $Process, [ $i, $p ] );
 						echo pc_cpq_get_input_html( 'max_thickness', $Process, [ $i, $p ] );
 						echo pc_cpq_get_input_html( 'unit', $Process, [ $i, $p ] );
+						echo pc_cpq_get_input_html( 'deposition_rate_override', $Process, [ $i, $p ] );
 						// echo spc_get_input_html( 'time', $Process, [ $i, $p ] );
 						?>
 						<div class="form-group row">

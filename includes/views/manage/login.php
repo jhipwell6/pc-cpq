@@ -54,7 +54,6 @@
 						<div class="col-4">
 							<input type="submit" name="wp-submit" id="wp-submit" class="btn btn-primary btn-block" value="Sign In">
 							<input type="hidden" name="redirect_to" value="<?php echo esc_url( $Site->get_manage_page_url() ); ?>">
-							<?php wp_nonce_field( 'pc_cpq_login', 'pc_cpq_login_nonce' ); ?>
 						</div>
 						<!-- /.col -->
 					</div>

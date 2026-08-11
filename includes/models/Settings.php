@@ -1322,8 +1322,16 @@ class Settings extends Abstract_Model
 		return $this->find_collection_row( $rack, $this->get_raw_racks() );
 	}
 
-	public function find_operation( $type, $metal )
+	public function find_operation( $type, $metal, $plating_method = null )
 	{
+		$matches = $this->find_operations( $type, $metal, $plating_method );
+		return ! empty( $matches ) ? array_first( $matches ) : null;
+	}
+
+	public function find_operations( $type, $metal, $plating_method = null )
+	{
+		$matches = [];
+
 		foreach ( $this->get_Operations() as $Operation ) {
 			if ( $Operation->get_type() !== $type ) {
 				continue;
@@ -1332,17 +1340,32 @@ class Settings extends Abstract_Model
 			$operation_metal = $Operation->get_metal();
 			if ( is_array( $operation_metal ) ) {
 				if ( in_array( $metal, $operation_metal, true ) ) {
-					return $Operation;
+					$matches[] = $Operation;
 				}
 				continue;
 			}
 
 			if ( $operation_metal === $metal ) {
-				return $Operation;
+				$matches[] = $Operation;
 			}
 		}
 
-		return null;
+		if ( 'Plating' === $type && $plating_method ) {
+			$method_matches = array_values( array_filter( $matches, function( $Operation ) use ( $plating_method ) {
+				return $Operation->get_plating_method() === $plating_method;
+			} ) );
+
+			if ( ! empty( $method_matches ) ) {
+				return $method_matches;
+			}
+
+			// Legacy plating operations without a method remain valid fallbacks.
+			$matches = array_values( array_filter( $matches, function( $Operation ) {
+				return empty( $Operation->get_plating_method() );
+			} ) );
+		}
+
+		return array_values( $matches );
 	}
 
 	public function get_whitelist_entries( $prop )

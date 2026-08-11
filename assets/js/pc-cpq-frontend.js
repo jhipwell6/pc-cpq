@@ -14,48 +14,74 @@
 		 */
 		PC_CPQ.Specs = {
 
-			apiUrl: 'https://stp-api.snowberrymedia.com/measure.php',
-
 			init() {
 				this.bind();
 			},
 
 			bind() {
 				if ( typeof gform != 'undefined' ) {
-					gform.addFilter( 'gform_file_upload_status_markup', $.proxy( this.processFiles, this ) );
+					gform.addFilter( 'gform_file_upload_markup', $.proxy( this.processFiles, this ) );
 				}
 			},
 
 			processFiles( html, file, up, strings, imagesUrl, response ) {
-				this.getModelData( file.getNative() );
-				$( '#gform_multifile_upload_1_11' ).addClass( 'file-added' );
+				const formId = up?.settings?.multipart_params?.form_id;
+				const fieldId = up?.settings?.multipart_params?.field_id;
+				const tempFilename = response?.data?.temp_filename;
+
+				if ( formId && fieldId ) {
+					$( `#gform_multifile_upload_${formId}_${fieldId}` ).addClass( 'file-added' );
+				}
+
+				if ( ! this.isStepFile( file.name ) ) {
+					this.saveFileData( file.name, { } );
+					return html;
+				}
+
+				if ( ! formId || ! fieldId || ! tempFilename ) {
+					this.saveFileData( file.name, { } );
+					return html;
+				}
+
+				this.getModelData( {
+					fileName: file.name,
+					formId,
+					fieldId,
+					tempFilename
+				} );
 
 				return html;
 			},
 
-			getModelData: async function ( file ) {
-				const formData = new FormData();
-				formData.append( 'file', file );
-				const response = await fetch( this.apiUrl, {
-					method: 'POST',
-					headers: {
-						'X-API-KEY': '9f4c8e1a7b3d6c2f0e5a4b8c1d9e7f6a2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7'
-					},
-					body: formData
-				} );
-				let text = await response.text();
-				if ( text.includes( '[{ "isSuccess"' ) ) { // fix json bug
-					text = text.replace( /\[\{/, '[{}],' );
-				}
-				const json = JSON.parse( text );
+			isStepFile( fileName ) {
+				return /\.(stp|step)$/i.test( fileName || '' );
+			},
 
-				if ( json.isSuccess ) {
-					for ( const data of json.filesInfo ) {
-						this.saveFileData( file.name, data );
+			getModelData: async function ( fileData ) {
+				try {
+					const formData = new FormData();
+					formData.append( 'action', 'pc_cpq_process_step_upload' );
+					formData.append( 'nonce', PC_CPQ_Config.stpProcessingNonce );
+					formData.append( 'form_id', fileData.formId );
+					formData.append( 'field_id', fileData.fieldId );
+					formData.append( 'temp_filename', fileData.tempFilename );
+					formData.append( 'uploaded_filename', fileData.fileName );
+
+					const response = await fetch( PC_CPQ_Config.ajaxurl, {
+						method: 'POST',
+						body: formData
+					} );
+					const json = await response.json();
+
+					if ( json?.success && json?.data?.measurement ) {
+						this.saveFileData( fileData.fileName, json.data.measurement );
+						return;
 					}
-				} else {
-					$( document ).trigger( 'spc:part_added', { fileName: file.name } );
+				} catch ( error ) {
+					// Preserve the existing UX by falling back to a file-only part.
 				}
+
+				this.saveFileData( fileData.fileName, { } );
 			},
 
 			saveFileData( fileName, data ) {
@@ -387,12 +413,326 @@
 			}
 		};
 
+		PC_CPQ.Phone = {
+
+			selector: [
+				'.gform_wrapper .ginput_container_phone input',
+				'.gform_wrapper .gfield--type-phone input',
+				'.gform_wrapper input[type="tel"]',
+				'.gform_wrapper input[id^="input_"][autocomplete="tel"]'
+			].join( ', ' ),
+			instances: new WeakMap(),
+			observer: null,
+			debug: true,
+			libraryLoadPromise: null,
+
+			init() {
+				this.log( 'init:start', {
+					intlTelInputAvailable: typeof window.intlTelInput === 'function',
+					selector: this.selector
+				} );
+				this.bind();
+				this.initInputs();
+				this.observeDom();
+			},
+
+			bind() {
+				this.log( 'bind:events' );
+				$( document ).on( 'gform_post_render', $.proxy( this.initInputs, this ) );
+				$( document ).on( 'gform_page_loaded', $.proxy( this.initInputs, this ) );
+				$( document ).on( 'submit', '.gform_wrapper form', $.proxy( this.prepareSubmit, this ) );
+			},
+
+			observeDom() {
+				if ( this.observer || typeof MutationObserver === 'undefined' ) {
+					this.log( 'observer:skip', {
+						hasObserver: !! this.observer,
+						mutationObserverAvailable: typeof MutationObserver !== 'undefined'
+					} );
+					return;
+				}
+
+				this.observer = new MutationObserver( () => {
+					this.log( 'observer:mutation' );
+					this.initInputs();
+				} );
+
+				document.querySelectorAll( '.gform_wrapper' ).forEach( ( wrapper ) => {
+					this.observer.observe( wrapper, { childList: true, subtree: true } );
+					this.log( 'observer:attached', {
+						wrapperClassName: wrapper.className
+					} );
+				} );
+			},
+
+			initInputs() {
+				this.log( 'initInputs:start', {
+					intlTelInputAvailable: typeof window.intlTelInput === 'function'
+				} );
+
+				if ( typeof window.intlTelInput !== 'function' ) {
+					this.log( 'initInputs:missing-library', {
+						scriptUrl: PC_CPQ_Config?.intlTelInput?.scriptUrl || ''
+					} );
+					this.ensureLibrary().then( () => {
+						this.log( 'initInputs:library-ready-after-load', {
+							intlTelInputAvailable: typeof window.intlTelInput === 'function'
+						} );
+						this.initInputs();
+					} ).catch( ( error ) => {
+						this.log( 'initInputs:library-load-failed', {
+							message: error?.message || 'Unknown error'
+						} );
+					} );
+					return;
+				}
+
+				const inputs = Array.from( document.querySelectorAll( this.selector ) );
+				this.log( 'initInputs:matched-inputs', {
+					count: inputs.length,
+					inputs: inputs.map( ( input ) => ( {
+						id: input.id || '',
+						name: input.name || '',
+						type: input.type || '',
+						autocomplete: input.autocomplete || '',
+						className: input.className || ''
+					} ) )
+				} );
+
+				inputs.forEach( ( input ) => {
+					const shouldAttach = this.shouldAttachToInput( input );
+					this.log( 'initInputs:candidate', {
+						id: input.id || '',
+						name: input.name || '',
+						type: input.type || '',
+						autocomplete: input.autocomplete || '',
+						className: input.className || '',
+						shouldAttach
+					} );
+
+					if ( shouldAttach ) {
+						this.initInput( input );
+					}
+				} );
+			},
+
+			shouldAttachToInput( input ) {
+				if ( ! input || ! input.name || input.type === 'hidden' ) {
+					this.log( 'shouldAttach:false-basic', {
+						hasInput: !! input,
+						name: input?.name || '',
+						type: input?.type || ''
+					} );
+					return false;
+				}
+
+				const wrapper = input.closest( '.gfield, .ginput_container, li' );
+				const wrapperClassName = wrapper?.className || '';
+				const inputId = input.id || '';
+				const inputName = input.name || '';
+				const autocomplete = input.autocomplete || '';
+
+				const result = /phone/i.test( wrapperClassName )
+					|| /phone/i.test( inputId )
+					|| /phone/i.test( inputName )
+					|| autocomplete === 'tel';
+
+				this.log( 'shouldAttach:result', {
+					id: inputId,
+					name: inputName,
+					autocomplete,
+					wrapperClassName,
+					result
+				} );
+
+				return result;
+			},
+
+			initInput( input ) {
+				if ( ! input || this.instances.has( input ) || ! input.name ) {
+					this.log( 'initInput:skip', {
+						hasInput: !! input,
+						alreadyInitialized: input ? this.instances.has( input ) : false,
+						name: input?.name || ''
+					} );
+					return;
+				}
+
+				this.log( 'initInput:attach', {
+					id: input.id || '',
+					name: input.name || '',
+					type: input.type || '',
+					value: input.value || ''
+				} );
+
+				const iti = window.intlTelInput( input, {
+					initialCountry: 'us',
+					countrySearch: true,
+					formatAsYouType: true,
+					numberDisplayFormat: 'NATIONAL',
+					placeholderNumberPolicy: 'AGGRESSIVE',
+					placeholderNumberType: 'MOBILE',
+					separateDialCode: true,
+					strictMode: true
+				} );
+
+				this.instances.set( input, iti );
+				input.dataset.pcCpqIntlTelReady = '1';
+				this.log( 'initInput:attached', {
+					id: input.id || '',
+					name: input.name || '',
+					hasDatasetFlag: input.dataset.pcCpqIntlTelReady === '1'
+				} );
+
+				if ( input.value ) {
+					iti.setNumber( input.value );
+					this.log( 'initInput:setNumber', {
+						id: input.id || '',
+						name: input.name || '',
+						value: input.value || ''
+					} );
+				}
+
+				input.addEventListener( 'countrychange', () => {
+					this.log( 'countrychange', {
+						id: input.id || '',
+						name: input.name || '',
+						value: input.value || '',
+						placeholder: input.placeholder || ''
+					} );
+					input.dispatchEvent( new Event( 'change', { bubbles: true } ) );
+				} );
+
+				window.setTimeout( () => {
+					this.log( 'initInput:post-init-state', {
+						id: input.id || '',
+						name: input.name || '',
+						value: input.value || '',
+						placeholder: input.placeholder || '',
+						selectedCountry: typeof iti.getSelectedCountry === 'function' ? iti.getSelectedCountry() : null
+					} );
+				}, 0 );
+			},
+
+			prepareSubmit( e ) {
+				this.log( 'prepareSubmit:start', {
+					formId: e.currentTarget?.id || ''
+				} );
+				e.currentTarget.querySelectorAll( this.selector ).forEach( ( input ) => {
+					const iti = this.instances.get( input );
+
+					if ( ! iti || ! input.value ) {
+						this.log( 'prepareSubmit:skip', {
+							id: input.id || '',
+							name: input.name || '',
+							hasInstance: !! iti,
+							value: input.value || ''
+						} );
+						return;
+					}
+
+					try {
+						const formatted = iti.getNumber();
+						if ( formatted ) {
+							input.value = formatted;
+						}
+						this.log( 'prepareSubmit:formatted', {
+							id: input.id || '',
+							name: input.name || '',
+							formatted: formatted || ''
+						} );
+					} catch ( error ) {
+						this.log( 'prepareSubmit:error', {
+							id: input.id || '',
+							name: input.name || '',
+							message: error?.message || 'Unknown error'
+						} );
+						// Leave the user's current input intact if utils are not ready yet.
+					}
+				} );
+			},
+
+			ensureLibrary() {
+				if ( typeof window.intlTelInput === 'function' ) {
+					return Promise.resolve( window.intlTelInput );
+				}
+
+				if ( this.libraryLoadPromise ) {
+					this.log( 'ensureLibrary:reuse-promise' );
+					return this.libraryLoadPromise;
+				}
+
+				const scriptUrl = PC_CPQ_Config?.intlTelInput?.scriptUrl;
+				if ( ! scriptUrl ) {
+					return Promise.reject( new Error( 'Missing intl-tel-input script URL.' ) );
+				}
+
+				this.log( 'ensureLibrary:start', { scriptUrl } );
+
+				this.libraryLoadPromise = new Promise( ( resolve, reject ) => {
+					const existingScript = document.querySelector( `script[data-pc-cpq-intl-tel-input="1"]` );
+					if ( existingScript ) {
+						this.log( 'ensureLibrary:existing-script-found' );
+						existingScript.addEventListener( 'load', () => {
+							if ( typeof window.intlTelInput === 'function' ) {
+								resolve( window.intlTelInput );
+								return;
+							}
+
+							reject( new Error( 'intl-tel-input script loaded but window.intlTelInput is unavailable.' ) );
+						}, { once: true } );
+						existingScript.addEventListener( 'error', () => {
+							reject( new Error( 'Existing intl-tel-input script failed to load.' ) );
+						}, { once: true } );
+						return;
+					}
+
+					const script = document.createElement( 'script' );
+					script.src = scriptUrl;
+					script.async = true;
+					script.dataset.pcCpqIntlTelInput = '1';
+					script.addEventListener( 'load', () => {
+						this.log( 'ensureLibrary:loaded', {
+							intlTelInputAvailable: typeof window.intlTelInput === 'function'
+						} );
+
+						if ( typeof window.intlTelInput === 'function' ) {
+							resolve( window.intlTelInput );
+							return;
+						}
+
+						reject( new Error( 'intl-tel-input loaded but did not expose window.intlTelInput.' ) );
+					}, { once: true } );
+					script.addEventListener( 'error', () => {
+						reject( new Error( 'Failed to load intl-tel-input script.' ) );
+					}, { once: true } );
+					document.head.appendChild( script );
+				} ).catch( ( error ) => {
+					this.libraryLoadPromise = null;
+					throw error;
+				} );
+
+				return this.libraryLoadPromise;
+			},
+
+			log( event, data = {} ) {
+				if ( ! this.debug || typeof console === 'undefined' ) {
+					return;
+				}
+
+				console.log( '[PC_CPQ Phone]', event, data );
+			}
+		};
+
 		const onDocReady = [
 			() => {
 				PC_CPQ.Specs.init();
 			},
 			() => {
 				PC_CPQ.Parts.init();
+			},
+			() => {
+				PC_CPQ.Phone.init();
 			}
 		];
 

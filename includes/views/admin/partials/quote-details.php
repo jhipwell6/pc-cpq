@@ -74,7 +74,6 @@
 //								'Inquiry'		=> $Lead->get_title(),
 								'Phone'			=> $Lead->get_phone(),
 								'Email'			=> $Lead->get_email(),
-								'Certification' => $Lead->needs_certification() ? 'Yes ($35)' : 'No',
 								'Ship Via'		=> 'ORIGIN',
 								'FOB'			=> 'ORIGIN',
 							);

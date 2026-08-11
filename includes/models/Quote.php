@@ -302,7 +302,7 @@ class Quote
 			'10' => $Lead->get_finishing_type(),
 			'11' => '',
 			'13' => $Lead->get_notes(),
-			'25.1' => $Lead->get_certification(),
+			'25.1' => $Lead->needs_certification() ? 1 : 0,
 			'26' => $Lead->get_phone(),
 		);
 

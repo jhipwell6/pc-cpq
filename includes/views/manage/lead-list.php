@@ -49,7 +49,7 @@
 					<th style="width: 5%">
 						#
 					</th>
-					<th style="width: 10%">
+					<th style="width: 14%">
 						Lead
 					</th>
 					<?php if ( PC_CPQ()->Settings()->is_nutshell_enabled() ) : ?>
@@ -72,7 +72,7 @@
 					<th style="width: 8%" class="text-center">
 						Status
 					</th>
-					<th style="width: 36%">
+					<th style="width: 32%">
 					</th>
 				</tr>
 			</thead>
@@ -143,6 +143,10 @@
 								</i>
 								View
 							</a>
+							<button type="button" class="btn btn-secondary btn-sm js-clone-lead" data-id="<?php echo $Lead->get_id(); ?>">
+								<i class="fas fa-clone"></i>
+								Clone
+							</button>
 							<button type="button" class="btn btn-danger btn-sm js-delete-lead" data-id="<?php echo $Lead->get_id(); ?>"<?php echo ! empty( $lock_status['locked'] ) ? ' disabled title="Locked by ' . esc_attr( $lock_status['lockUserName'] ) . '"' : ''; ?>>
 								<i class="fas fa-trash"></i>
 								Delete

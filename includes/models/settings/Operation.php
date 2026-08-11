@@ -18,6 +18,7 @@ class Operation extends Repeater_Model
 	protected $efficiency;
 	protected $type;
 	protected $base_metal;
+	protected $plating_method;
 	protected $material;
 	protected $metal;
 
@@ -65,6 +66,11 @@ class Operation extends Repeater_Model
 	{
 		return (array) $this->get_prop( 'base_metal' );
 	}
+
+	public function get_plating_method()
+	{
+		return $this->get_prop( 'plating_method' );
+	}
 	
 	public function get_base_metal_list()
 	{
@@ -81,6 +87,24 @@ class Operation extends Repeater_Model
 	{
 		return $this->get_prop( 'material' );
 	}
+
+	public function get_material_list()
+	{
+		$material = $this->get_material();
+		if ( is_array( $material ) && ! empty( $material ) ) {
+			return implode( ', ', $material );
+		}
+		return is_string( $material ) ? $material : '';
+	}
+
+	public function get_prep_match_label()
+	{
+		$label = $this->get_base_metal_list();
+		if ( $this->get_plating_method() ) {
+			$label .= sprintf( ' (%s)', $this->get_plating_method() );
+		}
+		return $label;
+	}
 	
 	public function get_truncated_description()
 	{
@@ -95,12 +119,13 @@ class Operation extends Repeater_Model
 		if ( null === $this->metal ) {
 			$this->metal = false;
 			switch ( $this->get_type() ) {
+				case 'Pre':
 				case 'Prep':
 					$this->metal = $this->get_base_metal();
 					break;
 				case 'Plating':
 				case 'Post':
-					$this->metal = $this->get_material();
+					$this->metal = (array) $this->get_material();
 					break;
 			}
 		}

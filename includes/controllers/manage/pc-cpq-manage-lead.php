@@ -24,6 +24,7 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 			'preview_quote' => 'preview_quote',
 			'requote' => 'requote',
 			'delete_lead' => 'delete_lead',
+			'clone_lead' => 'clone_lead',
 			'edit_lead' => 'edit_lead',
 			'send_message' => 'send_message',
 			'add_part' => 'add_part',
@@ -32,6 +33,7 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 			'add_part_quantity' => 'add_part_quantity',
 			'delete_part_quantity' => 'delete_part_quantity',
 			'add_part_process' => 'add_part_process',
+			'refresh_part_process_views' => 'refresh_part_process_views',
 			'add_part_operation' => 'add_part_operation',
 			'delete_part_process' => 'delete_part_process',
 			'delete_part_operation' => 'delete_part_operation',
@@ -66,11 +68,8 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 
 		$Lead = PC_CPQ()->lead( $lead_id );
 		$Lead->update_prop( 'quote_pricing_type', $send_quote_form['quote_pricing_type'] );
-		$Lead->update_prop( 'fees', $this->prepare_quote_fees( $send_quote_form ) );
+		$this->apply_selected_fees_to_lead( $Lead, $send_quote_form );
 		PC_CPQ()->Quote( $Lead )->send_quote( $send_quote_form['recipients'] );
-		
-		// handle fees
-		
 
 		$html = PC_CPQ()->view( 'manage/partials/quote-details', array( 'Lead' => $Lead ) );
 		wp_send_json_success( array(
@@ -91,7 +90,7 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 		$Quote = PC_CPQ()->Quote( $Lead );
 
 		$Lead->update_prop( 'quote_pricing_type', $send_quote_form['quote_pricing_type'] );
-		$Lead->update_prop( 'fees', $this->prepare_quote_fees( $send_quote_form ) );
+		$this->apply_selected_fees_to_lead( $Lead, $send_quote_form );
 
 		try {
 
@@ -134,7 +133,7 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 
 		$Lead = PC_CPQ()->lead( $lead_id );
 		$Lead->update_prop( 'quote_pricing_type', $preview_quote_form['quote_pricing_type'] );
-		$Lead->update_prop( 'fees', $this->prepare_quote_fees( $preview_quote_form ) );
+		$this->apply_selected_fees_to_lead( $Lead, $preview_quote_form );
 		$url = PC_CPQ()->Quote( $Lead )->get_preview_quote_url();
 
 		wp_send_json_success( array(
@@ -189,6 +188,18 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 		wp_send_json_success();
 	}
 
+	public function clone_lead()
+	{
+		$lead_id = Form_Handler::filter_input( 'lead_id' );
+		$Lead = PC_CPQ()->lead( $lead_id );
+		$Cloned_Lead = $Lead->clone_to_new();
+
+		wp_send_json_success( array(
+			'leadID' => $Cloned_Lead->get_id(),
+			'url' => $Cloned_Lead->get_manage_url(),
+		) );
+	}
+
 	public function edit_lead()
 	{
 		// Get form data
@@ -203,9 +214,10 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 
 		// Save the data
 		$Lead = PC_CPQ()->lead( $edit_lead_form['lead_id'] );
-		$this->process_lead_data( $edit_lead_form );
+		$this->process_lead_data( $edit_lead_form, $Lead );
 		$Lead->set_props( $edit_lead_form );
 		$Lead = $Lead->save();
+		$Lead->sync_legacy_certification_fee_flag();
 		$Lead->clear_override();
 
 		$this->render_lead_for_js( $Lead );
@@ -347,6 +359,27 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 		$Part->delete_Process( $index );
 
 		$this->render_processes_for_js( $Part, $part_id );
+	}
+
+	public function refresh_part_process_views()
+	{
+		$lead_id = Form_Handler::filter_input( 'lead_id' );
+		$this->assert_lead_editable( $lead_id );
+		$part_id = Form_Handler::filter_input( 'part_id' );
+		$Lead = PC_CPQ()->lead( $lead_id );
+		$Parts = $Lead->get_Parts();
+		$Part = $Parts[$part_id];
+
+		$this->refresh_part_process_data( $Part, $part_id );
+
+		$processes_html = PC_CPQ()->view( 'manage/partials/part-tab-processes', array( 'Part' => $Part, 'i' => $part_id ) );
+		$operations_html = PC_CPQ()->view( 'manage/partials/part-tab-plating', array( 'Part' => $Part, 'i' => $part_id ) );
+
+		wp_send_json_success( array(
+			'i' => $part_id,
+			'processesHtml' => minify_html( $processes_html ),
+			'operationsHtml' => minify_html( $operations_html ),
+		) );
 	}
 
 	public function add_part_operation()
@@ -556,7 +589,7 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 		}
 	}
 
-	private function process_lead_data( &$data )
+	private function process_lead_data( &$data, $Lead = null )
 	{
 		if ( isset( $data['status'] ) && $data['status'] == 'New' ) {
 			$data['status'] = 'Pending';
@@ -596,8 +629,19 @@ class PC_CPQ_Manage_Lead extends MVC_Controller_Registry
 		}, array_values( $selected_fees ) );
 	}
 
+	private function apply_selected_fees_to_lead( $Lead, $form_data )
+	{
+		$Lead->update_prop( 'fees', $this->prepare_quote_fees( $form_data ) );
+		$Lead->sync_legacy_certification_fee_flag();
+	}
+
 	private function assert_lead_editable( $lead_id )
 	{
+		$lead_id = absint( $lead_id );
+		if ( ! $lead_id ) {
+			return;
+		}
+
 		PC_CPQ()->Post_Lock()->assert_editable( $lead_id, 'lead' );
 	}
 }

@@ -16,6 +16,7 @@ class Lead extends Post_Model
 {
 	const POST_TYPE = 'lead';
 	const UNIQUE_KEY = 'quote_number';
+	const CERTIFICATION_FEE_NAME_FRAGMENT = 'certification';
 	const WP_PROPS = array(
 		'post_title' => 'title',
 		'post_content' => 'description',
@@ -175,6 +176,10 @@ class Lead extends Post_Model
 
 	public function needs_certification()
 	{
+		if ( $this->has_selected_certification_fee() ) {
+			return true;
+		}
+
 		return (bool) $this->get_certification();
 	}
 
@@ -352,7 +357,50 @@ class Lead extends Post_Model
 	
 	public function get_fees()
 	{
-		return $this->get_prop( 'fees' );
+		$fees = array_values( array_filter( (array) $this->get_prop( 'fees' ), function ( $fee ) {
+			return ! empty( $fee['fee'] );
+		} ) );
+
+		if ( $this->should_polyfill_legacy_certification_fee( $fees ) ) {
+			$fees[] = array(
+				'fee' => $this->get_certification_fee_name(),
+			);
+		}
+
+		return $fees;
+	}
+
+	public function get_selected_fee_names()
+	{
+		return wp_list_pluck( (array) $this->get_fees(), 'fee' );
+	}
+
+	public function get_stored_fee_names()
+	{
+		return wp_list_pluck( (array) $this->get_prop( 'fees' ), 'fee' );
+	}
+
+	public function get_certification_fee_name()
+	{
+		foreach ( (array) PC_CPQ()->Settings()->get_Fees() as $Fee ) {
+			if ( $this->is_certification_fee_match( $Fee ) ) {
+				return $Fee->get_name();
+			}
+		}
+
+		return '';
+	}
+
+	public function sync_legacy_certification_fee_flag()
+	{
+		$certification_fee_name = $this->get_certification_fee_name();
+		if ( '' === $certification_fee_name ) {
+			return $this;
+		}
+
+		$this->update_prop( 'certification', in_array( $certification_fee_name, $this->get_stored_fee_names(), true ) ? 1 : 0 );
+
+		return $this;
 	}
 
 	public function get_raw_parts()
@@ -845,6 +893,50 @@ class Lead extends Post_Model
 		return $CustomerModel->save();
 	}
 
+	public function get_clone_props()
+	{
+		return array(
+			'quote_number' => false,
+			'status' => 'New',
+			'title' => '',
+			'description' => $this->get_description(),
+			'first_name' => $this->get_first_name(),
+			'last_name' => $this->get_last_name(),
+			'email' => $this->get_email(),
+			'phone' => $this->get_phone(),
+			'company' => $this->get_company(),
+			'certification' => $this->get_certification(),
+			'include_metal_factor' => $this->get_include_metal_factor(),
+			'service' => $this->get_service(),
+			'industry' => $this->get_industry(),
+			'business' => $this->get_business(),
+			'finishing_type' => $this->get_finishing_type(),
+			'stage' => $this->get_stage(),
+			'notes' => $this->get_notes(),
+			'quote_notes' => $this->get_quote_notes(),
+			'quote_pricing_type' => $this->get_quote_pricing_type(),
+			'pricing_mode' => $this->get_pricing_mode(),
+			'raw_specs' => $this->get_raw_specs(),
+			'external_id' => '',
+			'nutshell_id' => '',
+			'form_entry_id' => $this->get_form_entry_id(),
+			'sent' => false,
+			'recipient' => $this->get_recipient(),
+			'fees' => $this->get_fees(),
+			'raw_customer' => $this->has_customer() ? $this->get_Customer()->get_id() : 0,
+			'raw_parts' => $this->get_raw_parts(),
+			'no_quote_email_message' => $this->get_no_quote_email_message(),
+		);
+	}
+
+	public function clone_to_new()
+	{
+		$Lead = new self();
+		$Lead->set_props( $this->get_clone_props() );
+
+		return $Lead->save();
+	}
+
 	private function flatten_array_values( $array, $key )
 	{
 		return array_filter( array_column( (array) $array, $key ) );
@@ -982,7 +1074,7 @@ class Lead extends Post_Model
 			'10' => $this->get_finishing_type(),
 			'11' => '',
 			'13' => $this->get_notes(),
-			'25.1' => $this->get_certification(),
+			'25.1' => $this->needs_certification() ? 1 : 0,
 			'26' => $this->get_phone(),
 		);
 		$entry_id = GFAPI::add_entry( $entry_data );
@@ -1012,5 +1104,39 @@ class Lead extends Post_Model
 		}
 
 		return false;
+	}
+
+	private function should_polyfill_legacy_certification_fee( array $fees )
+	{
+		$certification_fee_name = $this->get_certification_fee_name();
+
+		if ( '' === $certification_fee_name || ! (bool) $this->get_certification() ) {
+			return false;
+		}
+
+		return ! in_array( $certification_fee_name, wp_list_pluck( $fees, 'fee' ), true );
+	}
+
+	private function has_selected_certification_fee()
+	{
+		$certification_fee_name = $this->get_certification_fee_name();
+
+		return '' !== $certification_fee_name && $this->has_selected_fee( $certification_fee_name );
+	}
+
+	private function has_selected_fee( $fee_name )
+	{
+		return in_array( $fee_name, $this->get_selected_fee_names(), true );
+	}
+
+	private function is_certification_fee_match( $Fee )
+	{
+		$name = strtolower( trim( (string) $Fee->get_name() ) );
+
+		if ( '' === $name ) {
+			return false;
+		}
+
+		return false !== strpos( $name, self::CERTIFICATION_FEE_NAME_FRAGMENT );
 	}
 }

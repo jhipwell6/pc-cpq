@@ -65,6 +65,15 @@ tr.collapsing>td>p {
     background-color: #eef0fc !important;
 }
 
+.table tbody>tr>td:first-of-type,
+.table tbody>tr>th:first-of-type,
+.table tfoot>tr>td:first-of-type,
+.table tfoot>tr>th:first-of-type,
+.table thead>tr>td:first-of-type,
+.table thead>tr>th:first-of-type {
+	white-space: nowrap;
+}
+
 .wp-editor-wrap {
 	width: 100%;
 }
